@@ -20,17 +20,17 @@ import { LoginScreen } from './components/LoginScreen';
 import { Student, Payment } from './types';
 
 const MainAppContent: React.FC = () => {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
-  // If not logged in, show the dedicated full-screen login gate
-  if (!isAuthenticated) {
+  // إذا لم يكن المستخدم مسجلاً للدخول، يتم إظهار شاشة الدخول المخصصة
+  if (!isAuthenticated || !currentUser) {
     return <LoginScreen />;
   }
-  
-  // Print modal configuration
+
+  // إعدادات نافذة الطباعة
   const [printConfig, setPrintConfig] = useState<{
     isOpen: boolean;
     type: 'admission' | 'receipt' | 'gatekeeper' | null;
@@ -189,10 +189,12 @@ const MainAppContent: React.FC = () => {
       )}
 
       {/* Comprehensive Platform User Guide Modal */}
-      <UserGuideModal
-        isOpen={isGuideModalOpen}
-        onClose={() => setIsGuideModalOpen(false)}
-      />
+      {isGuideModalOpen && (
+        <UserGuideModal
+          isOpen={isGuideModalOpen}
+          onClose={() => setIsGuideModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
