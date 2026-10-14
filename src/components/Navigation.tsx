@@ -63,8 +63,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
   }, [currentUser, activeTab, visibleNavItems, canUserAccessModule, setActiveTab]);
 
   return (
-    <nav className="bg-[#FFFFFF] border-b border-[#E8DCCF] overflow-x-auto no-scrollbar py-2 px-4 shadow-2xs">
-      <div className="max-w-7xl mx-auto flex items-center gap-1.5 min-w-max">
+    <nav className="w-full bg-[#FFFFFF] border-b border-[#E8DCCF] overflow-x-auto py-2 px-2 sm:px-4 shadow-xs">
+      <div className="max-w-7xl mx-auto flex items-center justify-start gap-1 sm:gap-2 flex-nowrap w-max min-w-full">
         {visibleNavItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
