@@ -83,7 +83,7 @@ export const LoginScreen: React.FC = () => {
               </h1>
             </div>
             <p className="text-xs font-bold text-[#8C6D53] mt-1">
-              منصة السعيد — النظام الإداري الموحد للمدارس القرآنية
+              منصة السعيد — نظام إدارة المدارس القرآنية
             </p>
             <p className="text-[11px] text-[#A27B5C] font-medium mt-0.5">
               {settings.associationName}
