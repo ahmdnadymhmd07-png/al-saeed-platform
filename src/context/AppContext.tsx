@@ -314,14 +314,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Logout handler
-  const logout = () => {
+const logout = () => {
+    // 1. تسجيل الحدث في سجل الرقابة أولاً قبل مسح بيانات المستخدم
+    if (currentUser) {
+      addAuditLog('تسجيل خروج', `تسجيل خروج المستخدم ${currentUser.fullName}`);
+    }
+
+    // 2. إلغاء حالة تسجيل الدخول ومسح الجلسة من التخزين المحلي
     setIsAuthenticated(false);
     try {
       localStorage.removeItem(AUTH_KEY);
     } catch {
       // ignore
     }
-    addAuditLog('تسجيل خروج', `تسجيل خروج المستخدم ${currentUser.fullName}`);
+
+    // 3. إعادة تحميل الصفحة فوراً بشكل نظيف لمنع الشاشة البيضاء
+    window.location.reload();
   };
 
   // Clear all mock data
