@@ -1411,19 +1411,18 @@ const logout = () => {
   };
 
 const canUserAccessModule = (moduleName: string): boolean => {
-    // 1. حماية من الشاشة البيضاء: إذا لم يكن هناك مستخدم مسجل ارجع false فوراً
+    // 1. حماية من الشاشة البيضاء عند الخروج
     if (!currentUser) return false;
 
-    // 2. إذا كان أدمن أو لديه صلاحيات كاملة
+    // 2. حساب الأدمن له صلاحيات كاملة
     if (currentUser.role === 'admin') return true;
 
-    // 3. فحص الصلاحيات المحددة له
+    // 3. فحص الصلاحيات المخصصة
     if (currentUser.allowedModules && currentUser.allowedModules.length > 0) {
       return currentUser.allowedModules.includes(moduleName);
     }
 
-    return false;
-  };
+    // 4. الأدوار التلقائية للنظام
     switch (currentUser.role) {
       case 'finance':
         return ['dashboard', 'finance', 'reports'].includes(moduleName);
