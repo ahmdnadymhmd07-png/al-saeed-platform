@@ -81,7 +81,6 @@ export const SettingsView: React.FC = () => {
     teachers
   } = useApp();
 
-  // Only the system owner / admin can view or configure the Supabase Database Tab
   const isSystemOwner = currentUser.role === 'admin';
 
   type SettingsTab = 'users' | 'database' | 'report_template' | 'discipline_rules' | 'general' | 'fees' | 'templates' | 'audit' | 'backup';
@@ -121,7 +120,6 @@ export const SettingsView: React.FC = () => {
   const [editAllowedModules, setEditAllowedModules] = useState<string[]>([]);
   const [editActive, setEditActive] = useState(true);
 
-  // All Available Modules for Permission Configuration
   const availableModules: { id: string; label: string; desc: string }[] = [
     { id: 'dashboard', label: 'لوحة التحكم والإحصائيات', desc: 'متابعة المؤشرات العامة ومعدلات الحضور والإيراد' },
     { id: 'branches', label: 'إدارة الفروع والمقارنة', desc: 'بيانات الفروع وسعتها ومقارنة الأداء' },
@@ -136,7 +134,6 @@ export const SettingsView: React.FC = () => {
     { id: 'settings', label: 'إعدادات النظام واللائحة', desc: 'إدارة المستخدمين، قالب التقارير، والنسخ الاحتياطي' },
   ];
 
-  // Helper to get default modules for a role
   const getDefaultModulesForRole = (role: UserRole): string[] => {
     switch (role) {
       case 'admin':
@@ -161,13 +158,11 @@ export const SettingsView: React.FC = () => {
     attendance_supervisor: 'مشرفة الغياب والحضور'
   };
 
-  // Role change handler in add modal to update default modules
   const handleRoleChangeForAdd = (role: UserRole) => {
     setNewRole(role);
     setNewAllowedModules(getDefaultModulesForRole(role));
   };
 
-  // Open Edit User Modal
   const handleOpenEditUser = (user: User) => {
     setUserToEdit(user);
     setEditFullName(user.fullName);
@@ -183,7 +178,6 @@ export const SettingsView: React.FC = () => {
     setEditActive(user.active);
   };
 
-  // Save New User
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFullName.trim() || !newUsername.trim()) return;
@@ -217,7 +211,6 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
-  // Save Edit User
   const handleSaveUserEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userToEdit || !editFullName.trim() || !editUsername.trim()) return;
@@ -241,7 +234,6 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
-  // Handle general settings save
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings(localSettings);
@@ -249,7 +241,6 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
-  // Handle JSON backup download
   const handleDownloadBackup = () => {
     const jsonStr = exportBackupJson();
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -262,7 +253,6 @@ export const SettingsView: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // Handle JSON restore
   const handleFileRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -304,7 +294,6 @@ export const SettingsView: React.FC = () => {
               <span>حسابات العاملين والصلاحيات</span>
             </button>
 
-            {/* Supabase Database Tab (Restricted Strictly to System Owner) */}
             {isSystemOwner && (
               <button
                 onClick={() => setActiveTab('database')}
@@ -394,13 +383,9 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 1: USER ACCOUNTS & PERMISSIONS (إدارة حسابات العاملين والصلاحيات)     */}
-      {/* ========================================================================= */}
+      {/* TAB 1: USERS */}
       {activeTab === 'users' && (
         <div className="space-y-6">
-          
-          {/* Header Action Row */}
           <div className="bg-[#FFFFFF] p-5 rounded-2xl border border-[#E8DCCF] shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-sm font-bold text-[#4A2F18]">حسابات العاملين وتحديد الصفة ونطاق الفروع والصلاحيات</h3>
@@ -430,18 +415,16 @@ export const SettingsView: React.FC = () => {
             </button>
           </div>
 
-          {/* Quick Notice Banner */}
           <div className="bg-amber-50/70 border border-amber-200/80 p-4 rounded-2xl flex items-start gap-3 text-xs text-amber-950">
             <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-bold text-amber-900">ملاحظة حول تجربة وفحص الحسابات:</span>
               <p className="text-[11px] text-amber-900/90 leading-relaxed">
-                يمكنك تجربة واجهة أي موظف فوراً بالنقر على زر <strong>(تجربة الحساب)</strong> في بطاقة الموظف بالأسفل، أو من القائمة العلوية للهيدر، لمشاهدة ما يراه بالضبط بناءً على فروعه وصلاحياته المحددة.
+                يمكنك تجربة واجهة أي موظف فوراً بالنقر على زر <strong>(تجربة الحساب)</strong> في بطاقة الموظف بالأسفل، أو من القائمة العلوية للهيدر.
               </p>
             </div>
           </div>
 
-          {/* Users Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {users.map(user => {
               const isCurrent = currentUser.id === user.id;
@@ -456,8 +439,6 @@ export const SettingsView: React.FC = () => {
                   }`}
                 >
                   <div className="space-y-3">
-                    
-                    {/* Header: Name, Active & Current indicators */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
@@ -480,7 +461,6 @@ export const SettingsView: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Role Badge */}
                     <div className="p-2.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] flex items-center justify-between">
                       <span className="text-[11px] font-bold text-[#8C6D53]">الصفة / الدور:</span>
                       <span className="text-xs font-black text-[#4A2F18]">
@@ -488,7 +468,6 @@ export const SettingsView: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Branch Scope */}
                     <div className="space-y-1">
                       <span className="text-[11px] font-bold text-[#8C6D53] block">نطاق الفروع المتاح له:</span>
                       {hasAllBranches ? (
@@ -510,7 +489,6 @@ export const SettingsView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Permitted Modules count */}
                     <div className="pt-2 border-t border-[#E8DCCF]">
                       <span className="text-[10px] text-[#8C6D53] block">
                         الصلاحيات: {user.allowedModules ? user.allowedModules.length : availableModules.length} من {availableModules.length} تبويبات مسموحة
@@ -531,10 +509,8 @@ export const SettingsView: React.FC = () => {
                         )}
                       </div>
                     </div>
-
                   </div>
 
-                  {/* Actions footer */}
                   <div className="pt-4 mt-4 border-t border-[#E8DCCF] flex items-center justify-between gap-2">
                     <button
                       onClick={() => setCurrentUser(user)}
@@ -544,7 +520,6 @@ export const SettingsView: React.FC = () => {
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                           : 'bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18]'
                       }`}
-                      title="المعاينة والدخول بهذا الحساب لفحص الصلاحيات"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>{isCurrent ? 'حسابك الحالي' : 'تجربة الحساب'}</span>
@@ -576,18 +551,14 @@ export const SettingsView: React.FC = () => {
                       )}
                     </div>
                   </div>
-
                 </div>
               );
             })}
           </div>
-
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: REPORT PRINT TEMPLATE (قالب طباعة التقارير والمستندات الرسمية)      */}
-      {/* ========================================================================= */}
+      {/* TAB 2: REPORT TEMPLATE */}
       {activeTab === 'report_template' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-6 text-xs">
@@ -608,7 +579,6 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
 
-            {/* Header Settings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">الترويسة الرئيسية (أعلى الوثيقة)</label>
@@ -633,7 +603,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Logo and Stamp */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[#E8DCCF]">
               <div className="flex items-center gap-3 p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF]">
                 <input
@@ -659,7 +628,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Signatures Titles */}
             <div className="pt-4 border-t border-[#E8DCCF] space-y-3">
               <h4 className="text-xs font-bold text-[#4A2F18]">مسميات تواقيع الاعتماد الرسمية الثلاثة أسفل التقرير:</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -695,7 +663,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer notes & Gatekeeper notes */}
             <div className="pt-4 border-t border-[#E8DCCF] space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">الملاحظات القانونية والتحذيرية أسفل المستند المطبوع (Footer Notes)</label>
@@ -718,12 +685,9 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Live Template Visual Preview */}
             <div className="pt-4 border-t border-[#E8DCCF]">
               <span className="block text-xs font-bold text-[#4A2F18] mb-3">معاينة شكل التقرير المطبوع بالقالب المخصص:</span>
               <div className="bg-[#FFFFFF] p-6 rounded-2xl border-2 border-dashed border-[#B9895B]/50 shadow-inner space-y-4 max-w-3xl mx-auto">
-                
-                {/* Header preview */}
                 <div className="flex items-center justify-between border-b-2 border-[#4A2F18] pb-3">
                   <div className="flex items-center gap-3">
                     {localSettings.reportShowLogo !== false && (
@@ -750,14 +714,12 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Dummy table preview */}
                 <div className="py-2">
                   <div className="bg-gray-100 p-2 rounded text-center text-xs font-bold text-gray-700">
                     [ محتوى التقرير المطلوب: كشف البوابة / كشف الدرجات / التحصيل المالي / الحضور والغياب ]
                   </div>
                 </div>
 
-                {/* Signatures and Stamp Preview */}
                 <div className="pt-4 border-t border-gray-300 grid grid-cols-3 gap-4 text-center text-[10px]">
                   <div>
                     <span className="font-bold text-gray-700 block mb-4">{localSettings.reportSupervisorTitle || 'مشرفة الغياب'}</span>
@@ -791,14 +753,11 @@ export const SettingsView: React.FC = () => {
                 <span>حفظ التعديلات في النظام</span>
               </button>
             </div>
-
           </div>
         </form>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3: DISCIPLINE RULES (لوائح الانضباط وحدود الغياب المدرسية)            */}
-      {/* ========================================================================= */}
+      {/* TAB 3: DISCIPLINE RULES */}
       {activeTab === 'discipline_rules' && (
         <form onSubmit={handleSaveSettings} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-6 text-xs">
           <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-3">
@@ -819,8 +778,6 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            
-            {/* Level 1 */}
             <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-xs text-orange-900">المستوى الأول: الإنذار والاستدعاء</span>
@@ -848,7 +805,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Level 2 */}
             <div className="p-4 bg-red-50/70 border border-red-200 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-xs text-red-900">المستوى الثاني: الغرامة المالية</span>
@@ -896,7 +852,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Level 3 */}
             <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-xs text-purple-900">المستوى الثالث: الفصل المؤقت</span>
@@ -943,7 +898,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
-
           </div>
 
           <div className="pt-3 border-t border-[#E8DCCF] flex justify-end">
@@ -958,14 +912,11 @@ export const SettingsView: React.FC = () => {
         </form>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 4: GENERAL & IDENTITY (الهوية وبيانات المدرسة وشروط الالتحاق)         */}
-      {/* ========================================================================= */}
+      {/* TAB 4: GENERAL & IDENTITY */}
       {activeTab === 'general' && (
         <form onSubmit={handleSaveSettings} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4 text-xs">
           <h3 className="text-sm font-bold text-[#4A2F18] border-b border-[#E8DCCF] pb-2">بيانات وهوية المدرسة والجمعية</h3>
 
-          {/* Official Logo Display & Customizer */}
           <div className="p-4 bg-gradient-to-r from-[#F6EEE4] via-[#FDFBF7] to-[#F6EEE4] rounded-2xl border border-[#D4AF37]/50 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -1058,7 +1009,7 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-[#E8DCCF]">
-            <label className="block text-xs font-bold text-[#4A2F18] mb-1">نص شروط الالتحاق الثمانية للطباعة والتوقيع</label>
+            <label className="block text-xs font-bold text-[#4A2F18] mb-1">نص شروط الالتحاق للطباعة والتوقيع</label>
             <textarea
               rows={8}
               value={localSettings.termsText}
@@ -1079,9 +1030,7 @@ export const SettingsView: React.FC = () => {
         </form>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 5: FEES & SUBSCRIPTIONS (الرسوم والاشتراكات)                           */}
-      {/* ========================================================================= */}
+      {/* TAB 5: FEES */}
       {activeTab === 'fees' && (
         <form onSubmit={handleSaveSettings} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4 text-xs">
           <h3 className="text-sm font-bold text-[#4A2F18] border-b border-[#E8DCCF] pb-2">رسوم المراحل التعليمية ومواعيد الاستحقاق</h3>
@@ -1164,9 +1113,7 @@ export const SettingsView: React.FC = () => {
         </form>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 6: WHATSAPP TEMPLATES (قوالب رسائل واتساب)                           */}
-      {/* ========================================================================= */}
+      {/* TAB 6: WHATSAPP TEMPLATES */}
       {activeTab === 'templates' && (
         <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4 text-xs">
           <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-2">
@@ -1192,9 +1139,7 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 7: AUDIT LOG (سجل الرقابة الإدارية)                                    */}
-      {/* ========================================================================= */}
+      {/* TAB 7: AUDIT LOG */}
       {activeTab === 'audit' && (
         <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs">
           <div className="p-4 bg-[#F6EEE4] border-b border-[#E8DCCF] flex items-center justify-between">
@@ -1225,9 +1170,7 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 8: BACKUP & RESTORE (النسخ الاحتياطي)                                  */}
-      {/* ========================================================================= */}
+      {/* TAB 8: BACKUP */}
       {activeTab === 'backup' && (
         <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-6 text-xs">
           <div>
@@ -1238,8 +1181,6 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Download */}
             <div className="p-4 rounded-xl border border-[#E8DCCF] bg-[#F6EEE4] flex flex-col justify-between">
               <div>
                 <h4 className="font-bold text-xs text-[#4A2F18] flex items-center gap-1.5">
@@ -1258,7 +1199,6 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
 
-            {/* Restore */}
             <div className="p-4 rounded-xl border border-[#E8DCCF] bg-[#F6EEE4] flex flex-col justify-between">
               <div>
                 <h4 className="font-bold text-xs text-[#4A2F18] flex items-center gap-1.5">
@@ -1280,7 +1220,6 @@ export const SettingsView: React.FC = () => {
               </label>
             </div>
 
-            {/* Reset */}
             <div className="p-4 rounded-xl border border-red-200 bg-red-50 flex flex-col justify-between">
               <div>
                 <h4 className="font-bold text-xs text-red-900 flex items-center gap-1.5">
@@ -1293,7 +1232,7 @@ export const SettingsView: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  if (window.confirm('تحذير: هل أنت متأكد من إعادة تعيين البيانات للوضع النموذجي؟ سيتم مسح التغييرات غير المحفوظة.')) {
+                  if (window.confirm('تحذير: هل أنت متأكد من إعادة تعيين البيانات للوضع النموذجي؟')) {
                     resetToDemoData();
                     alert('تمت استعادة البيانات النموذجية الافتراضية بنجاح.');
                   }
@@ -1304,7 +1243,6 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
 
-            {/* Clear all mock/fake data completely */}
             <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 flex flex-col justify-between">
               <div>
                 <h4 className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
@@ -1317,9 +1255,9 @@ export const SettingsView: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  if (window.confirm('هل أنت متأكد من رغبتك في حذف وتفريغ كافة البيانات الوهمية من المنصة لتصبح نظيفة تماماً؟')) {
+                  if (window.confirm('هل أنت متأكد من رغبتك في حذف وتفريغ كافة البيانات الوهمية؟')) {
                     clearMockData();
-                    alert('تم تفريغ كافة البيانات الوهمية بنجاح! المنصة الآن نظيفة وجاهزة تماماً لاستقبال بياناتكم.');
+                    alert('تم تفريغ كافة البيانات الوهمية بنجاح!');
                   }
                 }}
                 className="mt-4 w-full py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
@@ -1327,18 +1265,13 @@ export const SettingsView: React.FC = () => {
                 <span>حذف البيانات الوهمية الآن</span>
               </button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 9: SUPABASE CLOUD DATABASE (قاعدة بيانات Supabase السحابية - لصاحب النظام فقط) */}
-      {/* ========================================================================= */}
+      {/* TAB 9: DATABASE */}
       {activeTab === 'database' && isSystemOwner && (
         <div className="space-y-6 text-xs">
-          
-          {/* Header Banner */}
           <div className="bg-[#FFFFFF] p-5 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -1358,12 +1291,11 @@ export const SettingsView: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[11px] text-[#8C6D53] mt-0.5">
-                    تخزين ومزامنة بيانات الطلاب، الحضور والغياب، الرسوم والاشتراكات، وحسابات الموظفين بشكل دائم ومباشر في السحابة
+                    تخزين ومزامنة بيانات الطلاب، الحضور والغياب، الرسوم والاشتراكات، وحسابات الموظفين
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -1415,7 +1347,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Status notice */}
             {(dbNotice || syncStatusMessage) && (
               <div className="p-3 bg-[#FDFBF9] border border-[#E8DCCF] rounded-xl flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2">
@@ -1427,10 +1358,7 @@ export const SettingsView: React.FC = () => {
             )}
           </div>
 
-          {/* Connection Details Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Project URL */}
             <div className="bg-[#FFFFFF] p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-2">
               <span className="text-[11px] font-bold text-[#8C6D53]">رابط خادم المشروع (SUPABASE_URL)</span>
               <div className="flex items-center justify-between gap-2 p-2 bg-[#F6EEE4] rounded-xl font-mono text-[11px] text-[#4A2F18] overflow-hidden text-ellipsis">
@@ -1443,7 +1371,6 @@ export const SettingsView: React.FC = () => {
                     setTimeout(() => setSuccessMessage(null), 2500);
                   }}
                   className="p-1 hover:bg-white rounded text-[#8C6D53] cursor-pointer"
-                  title="نسخ الرابط"
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </button>
@@ -1451,7 +1378,6 @@ export const SettingsView: React.FC = () => {
               <p className="text-[10px] text-[#8C6D53]">معرّف المشروع: <span className="font-mono font-bold text-[#4A2F18]">{getSupabaseDetails().projectId}</span></p>
             </div>
 
-            {/* Anon Key */}
             <div className="bg-[#FFFFFF] p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-2">
               <span className="text-[11px] font-bold text-[#8C6D53]">مفتاح الوصول العام (SUPABASE_ANON_KEY)</span>
               <div className="flex items-center justify-between gap-2 p-2 bg-[#F6EEE4] rounded-xl font-mono text-[11px] text-[#4A2F18] overflow-hidden">
@@ -1464,7 +1390,6 @@ export const SettingsView: React.FC = () => {
                     setTimeout(() => setSuccessMessage(null), 2500);
                   }}
                   className="p-1 hover:bg-white rounded text-[#8C6D53] cursor-pointer"
-                  title="نسخ المفتاح"
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </button>
@@ -1475,7 +1400,6 @@ export const SettingsView: React.FC = () => {
               </p>
             </div>
 
-            {/* Engine & Status */}
             <div className="bg-[#FFFFFF] p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-2 flex flex-col justify-between">
               <div>
                 <span className="text-[11px] font-bold text-[#8C6D53]">محرك ومكتبة الاتصال (Driver)</span>
@@ -1489,10 +1413,8 @@ export const SettingsView: React.FC = () => {
                 <span className="font-bold text-[#4A2F18]">22 جدولاً شاملاً</span>
               </div>
             </div>
-
           </div>
 
-          {/* Database Tables Overview Grid */}
           <div className="bg-[#FFFFFF] p-5 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1545,7 +1467,6 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          {/* SQL Schema Execution Guide & 1-Click Copy */}
           <div className="bg-[#FFFFFF] p-5 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
@@ -1591,7 +1512,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick 3-Step Guide */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/70 text-amber-950">
               <div className="space-y-1">
                 <span className="font-bold text-[11px] flex items-center gap-1 text-amber-900">
@@ -1624,7 +1544,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* SQL Code Preview Container */}
             <div className="relative rounded-xl border border-gray-800 bg-[#1A1A1A] text-gray-200 overflow-hidden font-mono text-[11px] dir-ltr text-left">
               <div className="px-4 py-2 bg-[#111] border-b border-gray-800 flex items-center justify-between text-[11px] text-gray-400">
                 <span className="font-bold text-gray-300">supabase_schema.sql (22 Tables + RLS Policies)</span>
@@ -1635,19 +1554,20 @@ export const SettingsView: React.FC = () => {
               </pre>
             </div>
           </div>
-
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: ADD EMPLOYEE USER (إضافة حساب موظف جديد)                           */}
+      {/* MODAL: ADD EMPLOYEE USER (إضافة حساب موظف جديد - معدل ومضبط للسرعة والـ Scroll) */}
       {/* ========================================================================= */}
       {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DCCF] shadow-xl p-6 space-y-5 my-8">
-            <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DCCF] shadow-2xl overflow-hidden flex flex-col max-h-[88vh] my-auto">
+            
+            {/* Modal Header (Fixed Top) */}
+            <div className="p-4 bg-[#F6EEE4] border-b border-[#E8DCCF] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#F6EEE4] flex items-center justify-center text-[#4A2F18]">
+                <div className="w-9 h-9 rounded-xl bg-white border border-[#E8DCCF] flex items-center justify-center text-[#4A2F18]">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
@@ -1658,15 +1578,15 @@ export const SettingsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsAddUserModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-base cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 font-bold text-base cursor-pointer p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
+            {/* Modal Body (Scrollable Area) */}
+            <form onSubmit={handleCreateUser} className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
               
-              {/* Basic Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">الاسم الكامل للموظف *</label>
@@ -1715,7 +1635,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Role Selection */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-2">
                 <label className="block text-xs font-bold text-[#4A2F18]">الصفة والتصنيف الوظيفي الأساسي:</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1757,7 +1676,7 @@ export const SettingsView: React.FC = () => {
                   <span className="text-[11px] font-bold text-[#8C6D53]">مسمى وظيفي مخصص (اختياري):</span>
                   <input
                     type="text"
-                    placeholder="مثال: منسقة شؤون طالبات فرع روضة السعيد"
+                    placeholder="مثال: مسؤول النظام والتقنية"
                     value={newRoleCustomTitle}
                     onChange={(e) => setNewRoleCustomTitle(e.target.value)}
                     className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-[#E8DCCF] bg-white"
@@ -1765,7 +1684,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Branch Scope Selection */}
               <div className="p-3.5 bg-[#FFFFFF] rounded-xl border border-[#E8DCCF] space-y-2">
                 <label className="block text-xs font-bold text-[#4A2F18]">نطاق الفروع المتاح لهذا الموظف رؤيتها:</label>
                 <div className="flex items-center gap-4 text-xs font-bold">
@@ -1823,7 +1741,6 @@ export const SettingsView: React.FC = () => {
                 )}
               </div>
 
-              {/* Permitted Modules Checkboxes */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-[#4A2F18]">تحديد ما يستطيع رؤيته والوصول إليه من التبويبات:</label>
@@ -1878,8 +1795,8 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Form Buttons */}
-              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-3">
+              {/* Modal Footer (Fixed Bottom) */}
+              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAddUserModalOpen(false)}
@@ -1902,14 +1819,16 @@ export const SettingsView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: EDIT EMPLOYEE USER (تعديل حساب موظف)                              */}
+      {/* MODAL: EDIT EMPLOYEE USER (تعديل حساب موظف - معدل ومضبط)                 */}
       {/* ========================================================================= */}
       {userToEdit && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DCCF] shadow-xl p-6 space-y-5 my-8">
-            <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DCCF] shadow-2xl overflow-hidden flex flex-col max-h-[88vh] my-auto">
+            
+            {/* Modal Header */}
+            <div className="p-4 bg-[#F6EEE4] border-b border-[#E8DCCF] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#F6EEE4] flex items-center justify-center text-[#4A2F18]">
+                <div className="w-9 h-9 rounded-xl bg-white border border-[#E8DCCF] flex items-center justify-center text-[#4A2F18]">
                   <Edit3 className="w-5 h-5" />
                 </div>
                 <div>
@@ -1920,15 +1839,15 @@ export const SettingsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setUserToEdit(null)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-base cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 font-bold text-base cursor-pointer p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveUserEdit} className="space-y-4 text-xs">
+            {/* Modal Body */}
+            <form onSubmit={handleSaveUserEdit} className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
               
-              {/* Basic Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">الاسم الكامل *</label>
@@ -1974,7 +1893,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Role Selection */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-2">
                 <label className="block text-xs font-bold text-[#4A2F18]">الصفة والتصنيف الوظيفي:</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -2023,7 +1941,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Branch Scope Selection */}
               <div className="p-3.5 bg-[#FFFFFF] rounded-xl border border-[#E8DCCF] space-y-2">
                 <label className="block text-xs font-bold text-[#4A2F18]">نطاق الفروع المتاح له:</label>
                 <div className="flex items-center gap-4 text-xs font-bold">
@@ -2081,7 +1998,6 @@ export const SettingsView: React.FC = () => {
                 )}
               </div>
 
-              {/* Permitted Modules Checkboxes */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-[#4A2F18]">التبويبات المسموحة للحساب:</label>
@@ -2136,7 +2052,6 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Active Toggle */}
               <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <input
                   type="checkbox"
@@ -2150,8 +2065,8 @@ export const SettingsView: React.FC = () => {
                 </label>
               </div>
 
-              {/* Form Buttons */}
-              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-3">
+              {/* Modal Footer */}
+              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setUserToEdit(null)}
