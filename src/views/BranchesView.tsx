@@ -388,7 +388,6 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
               <span>مقارنة إحصائيات الفروع</span>
             </button>
 
-            {/* Contextual Action Button based on active subtab */}
             {currentUser?.role === 'admin' && (
               <>
                 {subTab === 'branches' && (
@@ -461,7 +460,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              <span>الحلقات القرآنية ({groups.length})</span>
+              <span>الحلقات والمجموعات ({groups.length})</span>
             </button>
           </div>
 
@@ -708,12 +707,12 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs">
-              <span className="text-[#8C6D53] font-bold block text-[11px]">مشايخ اللقاء التربوي</span>
+              <span className="text-[#8C6D53] font-bold block text-[11px]">مشايخ لقاء الجمعة</span>
               <div className="mt-1 flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-[#B9895B] tabular-nums">
                   {teachers.filter(t => t.departmentIds?.includes('tarbawi')).length}
                 </span>
-                <span className="text-[10px] text-[#8C6D53]">التربوي والآداب</span>
+                <span className="text-[10px] text-[#8C6D53]">اللقاء التربوي</span>
               </div>
             </div>
           </div>
@@ -755,8 +754,8 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                   className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value="all">كل الأقسام</option>
-                  <option value="tahfeez">تحفيظ القرآن الكريم</option>
-                  <option value="tarbawi">النشاط التربوي والآداب</option>
+                  <option value="tahfeez">قسم التحفيظ</option>
+                  <option value="tarbawi">قسم لقاء الجمعة</option>
                 </select>
               </div>
 
@@ -866,12 +865,12 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                           <span className="text-[10px] font-bold text-[#8C6D53]">الأقسام:</span>
                           {teacher.departmentIds?.includes('tahfeez') && (
                             <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
-                              تحفيظ القرآن
+                              قسم التحفيظ
                             </span>
                           )}
                           {teacher.departmentIds?.includes('tarbawi') && (
                             <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-bold">
-                              النشاط التربوي
+                              قسم لقاء الجمعة
                             </span>
                           )}
                         </div>
@@ -950,7 +949,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
         <div className="space-y-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="bg-white p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs">
-              <span className="text-[#8C6D53] font-bold block text-[11px]">إجمالي الحلقات القرآنية</span>
+              <span className="text-[#8C6D53] font-bold block text-[11px]">إجمالي الحلقات والمجموعات</span>
               <div className="mt-1 flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-[#4A2F18] tabular-nums">{groups.length}</span>
                 <span className="text-[10px] text-[#8C6D53]">حلقة ومجموعة</span>
@@ -968,12 +967,12 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-[#E8DCCF] shadow-2xs">
-              <span className="text-[#8C6D53] font-bold block text-[11px]">مجموعات اللقاء التربوي</span>
+              <span className="text-[#8C6D53] font-bold block text-[11px]">مجموعات لقاء الجمعة</span>
               <div className="mt-1 flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-[#B9895B] tabular-nums">
                   {groups.filter(g => g.departmentId === 'tarbawi').length}
                 </span>
-                <span className="text-[10px] text-[#8C6D53]">التربوي والآداب</span>
+                <span className="text-[10px] text-[#8C6D53]">اللقاء التربوي والآداب</span>
               </div>
             </div>
 
@@ -1025,8 +1024,8 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                   className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value="all">كل الأقسام</option>
-                  <option value="tahfeez">حلقات التحفيظ</option>
-                  <option value="tarbawi">حلقات اللقاء التربوي</option>
+                  <option value="tahfeez">قسم التحفيظ</option>
+                  <option value="tarbawi">قسم لقاء الجمعة</option>
                 </select>
               </div>
 
@@ -1115,7 +1114,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             isTahfeez ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {isTahfeez ? 'تحفيظ القرآن' : 'النشاط التربوي'}
+                            {isTahfeez ? 'قسم التحفيظ' : 'قسم لقاء الجمعة'}
                           </span>
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                             group.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
@@ -1518,7 +1517,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                       }}
                       className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
                     />
-                    <span>قسم تحفيظ القرآن الكريم</span>
+                    <span>قسم التحفيظ</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-[#4A2F18]">
@@ -1531,7 +1530,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                       }}
                       className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
                     />
-                    <span>قسم النشاط التربوي والآداب</span>
+                    <span>قسم لقاء الجمعة</span>
                   </label>
                 </div>
               </div>
@@ -1619,8 +1618,8 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                     onChange={(e) => setGDeptId(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-bold text-xs focus:outline-none focus:border-[#4A2F18]"
                   >
-                    <option value="tahfeez">تحفيظ القرآن الكريم</option>
-                    <option value="tarbawi">النشاط التربوي والآداب</option>
+                    <option value="tahfeez">قسم التحفيظ</option>
+                    <option value="tarbawi">قسم لقاء الجمعة</option>
                   </select>
                 </div>
 
