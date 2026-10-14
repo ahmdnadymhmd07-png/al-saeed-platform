@@ -9,13 +9,17 @@ import {
   Calendar, 
   Save, 
   FileText,
-  AlertCircle
+  AlertCircle,
+  UserPlus,
+  Building2
 } from 'lucide-react';
 
 export const TeacherAttendanceView: React.FC = () => {
   const { 
     teachers, 
+    addTeacher,
     groups, 
+    branches,
     teacherAttendance, 
     saveTeacherAttendance, 
     selectedBranchId, 
@@ -25,6 +29,40 @@ export const TeacherAttendanceView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [source, setSource] = useState<TeacherAttendanceSource>('register');
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
+  // Quick Add Teacher Modal State
+  const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
+  const [newFullName, setNewFullName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newBranchId, setNewBranchId] = useState<string>(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
+  const [newDeptIds, setNewDeptIds] = useState<string[]>(['tahfeez']);
+  const [newNotes, setNewNotes] = useState('');
+
+  const handleOpenAddTeacher = () => {
+    setNewFullName('');
+    setNewPhone('');
+    setNewBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
+    setNewDeptIds(['tahfeez']);
+    setNewNotes('');
+    setIsAddTeacherOpen(true);
+  };
+
+  const handleCreateTeacher = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFullName.trim()) return;
+
+    addTeacher({
+      fullName: newFullName.trim(),
+      phone: newPhone.trim(),
+      branchId: newBranchId || branches[0]?.id || 'b1',
+      departmentIds: newDeptIds.length > 0 ? newDeptIds : ['tahfeez'],
+      active: true,
+      notes: newNotes.trim()
+    });
+
+    setIsAddTeacherOpen(false);
+    setSaveNotice(`تمت إضافة المعلم الشيخ (${newFullName.trim()}) بنجاح إلى سجل الحضور.`);
+  };
 
   // Filter teachers by branch
   const branchTeachers = useMemo(() => {
@@ -105,8 +143,15 @@ export const TeacherAttendanceView: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleOpenAddTeacher}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] border border-[#E8DCCF] rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-[#8C6D53]" />
+              <span>إضافة معلم جديد</span>
+            </button>
+            <button
               onClick={handleSaveAll}
-              className="flex items-center gap-2 px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border border-[#4A2F18]"
             >
               <Save className="w-4 h-4 text-[#D8C3AE]" />
               <span>حفظ سجل اليوم</span>
@@ -159,8 +204,22 @@ export const TeacherAttendanceView: React.FC = () => {
 
         <div className="divide-y divide-[#E8DCCF]">
           {branchTeachers.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#8C6D53]">
-              لا يوجد معلمون مسجلون في هذا الفرع.
+            <div className="p-10 text-center text-xs text-[#8C6D53] space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#F6EEE4] text-[#8C6D53] flex items-center justify-center mx-auto border border-[#E8DCCF]">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <p className="font-bold text-[#4A2F18] text-sm">لا يوجد معلمون مسجلون في هذا الفرع حالياً</p>
+              <p className="text-[11px] max-w-sm mx-auto">
+                يمكنك إضافة المعلمين والمحفظين للفرع الآن للبدء في توثيق الحضور والغياب وساعات الحصص.
+              </p>
+              <button
+                type="button"
+                onClick={handleOpenAddTeacher}
+                className="mt-1 px-4 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+              >
+                <UserPlus className="w-4 h-4 text-[#D8C3AE]" />
+                <span>إضافة أول معلم الآن</span>
+              </button>
             </div>
           ) : (
             branchTeachers.map((teacher, index) => {
@@ -277,6 +336,120 @@ export const TeacherAttendanceView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal: Quick Add Teacher */}
+      {isAddTeacherOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] my-auto">
+            <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-[#D4AF37]" />
+                <h3 className="text-sm font-bold">إضافة معلم / محفظ جديد</h3>
+              </div>
+              <button onClick={() => setIsAddTeacherOpen(false)} className="text-white hover:text-red-200 font-bold px-2 cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateTeacher} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم الشيخ / المعلم كاملاً *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: الشيخ مصطفى عبد الرحيم"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-semibold text-xs focus:outline-none focus:border-[#4A2F18]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">رقم الهاتف / الواتساب</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 01012345678"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-mono text-xs focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">الفرع المخصص *</label>
+                  <select
+                    value={newBranchId}
+                    onChange={(e) => setNewBranchId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-bold text-xs focus:outline-none"
+                  >
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Departments */}
+              <div className="space-y-1.5 p-3 bg-[#FBF8F5] rounded-xl border border-[#E8DCCF]">
+                <label className="block text-xs font-bold text-[#4A2F18]">الأقسام التي يُدرّس بها:</label>
+                <div className="flex items-center gap-4 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-[#4A2F18]">
+                    <input
+                      type="checkbox"
+                      checked={newDeptIds.includes('tahfeez')}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewDeptIds(prev => [...prev, 'tahfeez']);
+                        else setNewDeptIds(prev => prev.filter(d => d !== 'tahfeez'));
+                      }}
+                      className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
+                    />
+                    <span>قسم تحفيظ القرآن الكريم</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-[#4A2F18]">
+                    <input
+                      type="checkbox"
+                      checked={newDeptIds.includes('tarbawi')}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewDeptIds(prev => [...prev, 'tarbawi']);
+                        else setNewDeptIds(prev => prev.filter(d => d !== 'tarbawi'));
+                      }}
+                      className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
+                    />
+                    <span>قسم النشاط التربوي</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">ملاحظات ومؤهلات الشيخ</label>
+                <textarea
+                  rows={2}
+                  placeholder="إجازات قرآنية، مؤهل أزهري، ملاحظات..."
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] text-xs focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTeacherOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl font-bold transition shadow-xs cursor-pointer"
+                >
+                  حفظ المعلم
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
