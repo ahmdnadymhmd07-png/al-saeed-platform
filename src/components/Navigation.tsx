@@ -38,7 +38,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
 
   const allNavItems: { id: NavTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'لوحة التحكم والإحصائيات', icon: LayoutDashboard },
-    { id: 'branches', label: 'إدارة الفروع والمقارنة', icon: Building2 },
+    { id: 'branches', label: 'الفروع والحلقات والمعلمين', icon: Building2 },
     { id: 'students', label: 'الطلاب والتقديم', icon: GraduationCap },
     { id: 'student_attendance', label: 'تحضير الطلاب', icon: CalendarCheck },
     { id: 'teacher_attendance', label: 'حضور المعلمين', icon: Clock },
