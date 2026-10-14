@@ -1410,11 +1410,20 @@ const logout = () => {
     addAuditLog('حذف مستخدم', `حذف حساب المستخدم ${id}`);
   };
 
-  const canUserAccessModule = (moduleName: string): boolean => {
+const canUserAccessModule = (moduleName: string): boolean => {
+    // 1. حماية من الشاشة البيضاء: إذا لم يكن هناك مستخدم مسجل ارجع false فوراً
+    if (!currentUser) return false;
+
+    // 2. إذا كان أدمن أو لديه صلاحيات كاملة
     if (currentUser.role === 'admin') return true;
+
+    // 3. فحص الصلاحيات المحددة له
     if (currentUser.allowedModules && currentUser.allowedModules.length > 0) {
       return currentUser.allowedModules.includes(moduleName);
     }
+
+    return false;
+  };
     switch (currentUser.role) {
       case 'finance':
         return ['dashboard', 'finance', 'reports'].includes(moduleName);
