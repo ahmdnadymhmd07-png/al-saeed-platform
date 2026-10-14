@@ -83,8 +83,8 @@ export const defaultFeePlans = [
 
 // 8. إعدادات المنصة المحدثة باسمك
 export const initialSettings: SchoolSettings = {
-  associationName: 'مدرسة السعيد القرآنية',
-  schoolName: 'منصة السعيد التعليمية',
+  associationName: 'مدرسة السعيد للقرآن الكريم',
+  schoolName: 'منصة السعيد',
   logoUrl: OFFICIAL_SCHOOL_LOGO || '/school_logo.jpg',
   phone: '',
   email: '',
@@ -101,7 +101,7 @@ export const initialSettings: SchoolSettings = {
   dueDay: 10,
   graceDays: 5,
   sendExcusedAbsentWhatsApp: false,
-  termsText: `شروط الالتحاق بمدرسة السعيد القرآنية:
+  termsText: `شروط الالتحاق بمدرسة السعيد للقرآن الكريم:
 1. الالتزام بمنهج المدرسة القائم على الكتاب والسنة المطهرة.
 2. الالتزام بالحضور المنتظم في الحلقات واللقاءات التربوية.
 3. لا يُقبل الغياب إلا لعذر قهري يقدم كتابة للمشرف.
@@ -156,7 +156,7 @@ export const initialAuditLogs: AuditLog[] = [
     userId: 'u1',
     userName: 'م/ أحمد نادي',
     action: 'تهيئة المنصة',
-    details: 'تهيئة نظام منصة السعيد القرآنية وتدشين العمل بقاعدة البيانات الحقيقية',
+    details: 'تهيئة نظام منصة السعيد وتدشين العمل بقاعدة البيانات الحقيقية',
     timestamp: new Date().toISOString()
   }
 ];
