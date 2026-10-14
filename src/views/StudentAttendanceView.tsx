@@ -13,7 +13,8 @@ import {
   CheckCheck,
   MessageSquare,
   Sparkles,
-  Printer
+  Printer,
+  BookOpen
 } from 'lucide-react';
 
 interface StudentAttendanceViewProps {
@@ -318,9 +319,19 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
         </div>
 
         <div className="divide-y divide-[#E8DCCF]">
-          {groupStudents.length === 0 ? (
+          {!activeGroup ? (
+            <div className="p-10 text-center text-xs text-[#8C6D53] space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#F6EEE4] text-[#8C6D53] flex items-center justify-center mx-auto border border-[#E8DCCF]">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <p className="font-bold text-[#4A2F18] text-sm">لا توجد حلقة قرآنية مسجلة في هذا القسم حالياً</p>
+              <p className="text-[11px] max-w-sm mx-auto">
+                يمكنك الانتقال لقسم (الفروع والحلقات والمعلمين) لإنشاء حلقة جديدة وتعيين الشيخ المحفظ وجدول المواعيد.
+              </p>
+            </div>
+          ) : groupStudents.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#8C6D53]">
-              لا يوجد طلاب مسجلون في هذه الحلقة حالياً.
+              لا يوجد طلاب مسجلون في هذه الحلقة حالياً. يمكنك تسكين الطلاب في الحلقة من تبويب (الطلاب والتقديم).
             </div>
           ) : (
             groupStudents.map((student, idx) => {
