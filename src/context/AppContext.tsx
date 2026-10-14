@@ -126,8 +126,10 @@ interface AppContextType {
   
   addTeacher: (teacher: Omit<Teacher, 'id'>) => void;
   updateTeacher: (id: string, teacher: Partial<Teacher>) => void;
+  deleteTeacher: (id: string) => void;
   addGroup: (group: Omit<Group, 'id'>) => void;
   updateGroup: (id: string, group: Partial<Group>) => void;
+  deleteGroup: (id: string) => void;
   addBranch: (branch: Omit<Branch, 'id'>) => void;
   updateBranch: (id: string, updates: Partial<Branch>) => void;
   toggleBranchStatus: (id: string) => void;
@@ -167,6 +169,15 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_PREFIX = 'alsaeed_v2_live_';
 const AUTH_KEY = 'alsaeed_authenticated_user_id';
+
+try {
+  const legacyPrefix = 'alsaeed_quran_platform_';
+  ['students', 'families', 'studentAttendance', 'teacherAttendance', 'disciplineCases', 'dues', 'payments', 'sales', 'rewardGrants', 'pointsLedger', 'studentNotes', 'messageLogs'].forEach(k => {
+    localStorage.removeItem(legacyPrefix + k);
+  });
+} catch {
+  // Ignore in non-browser environments
+}
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -244,7 +255,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return loaded;
   });
 
-  // Safe Audit Logger
   const addAuditLog = (action: string, details: string) => {
     if (!currentUser) return;
     const entry: AuditLog = {
@@ -258,7 +268,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuditLogs(prev => [entry, ...prev]);
   };
 
-  // Login handler with clean state initialization
   const login = (usernameOrPhone: string, password?: string): boolean => {
     const rawInput = usernameOrPhone.trim();
     const trimmed = rawInput.toLowerCase();
@@ -301,12 +310,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ignore
     }
 
-    // Refresh application state cleanly on login
     window.location.reload();
     return true;
   };
 
-  // Logout handler
   const logout = () => {
     if (currentUser) {
       addAuditLog('تسجيل خروج', `تسجيل خروج المستخدم ${currentUser.fullName}`);
@@ -1185,6 +1192,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const deleteTeacher = (id: string) => {
+    const teacher = teachers.find(t => t.id === id);
+    setTeachers(prev => prev.filter(t => t.id !== id));
+    deleteRecord('teachers', id);
+    if (teacher) {
+      addAuditLog('حذف معلم', `حذف المعلم ${teacher.fullName}`);
+    }
+  };
+
   const addGroup = (g: Omit<Group, 'id'>) => {
     const newG: Group = { ...g, id: 'g_' + Date.now() };
     setGroups(prev => [...prev, newG]);
@@ -1201,6 +1217,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return updated;
     });
+  };
+
+  const deleteGroup = (id: string) => {
+    const group = groups.find(g => g.id === id);
+    setGroups(prev => prev.filter(g => g.id !== id));
+    deleteRecord('groups', id);
+    if (group) {
+      addAuditLog('حذف حلقة', `حذف الحلقة ${group.name}`);
+    }
   };
 
   const addBranch = (b: Omit<Branch, 'id'>) => {
@@ -1471,8 +1496,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logMessageSent,
         addTeacher,
         updateTeacher,
+        deleteTeacher,
         addGroup,
         updateGroup,
+        deleteGroup,
         addBranch,
         updateBranch,
         toggleBranchStatus,
