@@ -5,18 +5,13 @@ import {
   UserPlus, 
   Search, 
   Download, 
-  Upload, 
-  Filter, 
   ShieldAlert, 
   Eye, 
-  Edit3, 
   Trash2, 
   Printer, 
   CheckCircle2, 
   AlertCircle,
-  Users,
   UserMinus,
-  UserCheck,
   RefreshCw
 } from 'lucide-react';
 
@@ -34,7 +29,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     families, 
     selectedBranchId, 
     addStudent, 
-    updateStudent, 
     deleteStudent, 
     setStudentDropped,
     reactivateStudent,
@@ -45,6 +39,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [genderFilter, setGenderFilter] = useState<string>('all'); // 👈 فلتر النوع
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [bannedFilter, setBannedFilter] = useState<string>('all');
   const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -60,6 +55,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   // Form state
   const [fullName, setFullName] = useState('');
+  const [gender, setGender] = useState<'male' | 'female'>('male'); // 👈 حالة النوع في الاستمارة
   const [stage, setStage] = useState<EducationalStage>('primary');
   const [grade, setGrade] = useState('الصف الرابع الابتدائي');
   const [tahfeezGroupId, setTahfeezGroupId] = useState(groups.find(g => g.departmentId === 'tahfeez')?.id || '');
@@ -80,6 +76,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     return students.filter(s => {
       if (selectedBranchId !== 'all' && s.branchId !== selectedBranchId) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+      if (genderFilter !== 'all' && s.gender !== genderFilter) return false; // 👈 تطبيق فلتر النوع
       if (stageFilter !== 'all' && s.stage !== stageFilter) return false;
       if (groupFilter !== 'all' && s.tahfeezGroupId !== groupFilter && s.tarbawiGroupId !== groupFilter) return false;
       if (bannedFilter === 'banned') {
@@ -93,7 +90,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       }
       return true;
     });
-  }, [students, selectedBranchId, statusFilter, stageFilter, groupFilter, bannedFilter, searchQuery, checkStudentBan]);
+  }, [students, selectedBranchId, statusFilter, genderFilter, stageFilter, groupFilter, bannedFilter, searchQuery, checkStudentBan]);
 
   // Selected Group Helper for Tahfeez & Tarbawi
   const selectedTahfeezGroup = groups.find(g => g.id === tahfeezGroupId);
@@ -121,12 +118,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     else setGrade('الصف الأول الثانوي');
   };
 
-  // Submit Admission Form (FR-04)
+  // Submit Admission Form
   const handleSubmitStudent = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    // 1. Validate 4-part name (FR-04: الاسم رباعي، إلزامي، أربعة أجزاء على الأقل)
+    // 1. Validate 4-part name
     const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
     if (nameParts.length < 4) {
       setFormError('الاسم رباعي إلزامي: يرجى كتابة الاسم الرباعي كاملاً (4 أجزاء على الأقل)');
@@ -139,7 +136,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       setFormError('يرجى إدخال رقم هاتف ولي الأمر صحيحاً');
       return;
     }
-    // Convert to international Egypt format (+20 without leading 0)
     let finalPhone = cleaned;
     if (finalPhone.startsWith('0')) {
       finalPhone = '20' + finalPhone.substring(1);
@@ -158,6 +154,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     const newStudent = addStudent({
       branchId: branchToAssign,
       fullName: fullName.trim(),
+      gender, // 👈 إرسال النوع أثناء حفظ الطالب
       grade,
       stage,
       guardianPhone: finalPhone,
@@ -177,6 +174,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
     // Reset and close
     setFullName('');
+    setGender('male'); // 👈 إعادة تعيين النوع
     setGuardianPhone('');
     setIsOrphan(false);
     setFeeDiscountAmount(0);
@@ -192,10 +190,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   // Export CSV
   const handleExportCSV = () => {
-    const headers = ['المعرف', 'الاسم رباعي', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
+    const headers = ['المعرف', 'الاسم رباعي', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
     const rows = filteredStudents.map(s => [
       s.id,
       `"${s.fullName}"`,
+      s.gender === 'female' ? 'أنثى' : 'ذكر',
       s.stage === 'primary' ? 'ابتدائي' : s.stage === 'prep' ? 'إعدادي' : 'ثانوي فما فوق',
       `"${s.grade}"`,
       s.guardianPhone,
@@ -248,12 +247,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF]">
+      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF]">
         <div className="relative sm:col-span-1">
           <Search className="w-4 h-4 absolute right-3 top-2.5 text-[#8C6D53]" />
           <input
             type="text"
-            placeholder="بحث بالاسم رباعي أو رقم الهاتف..."
+            placeholder="بحث بالاسم أو الهاتف..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-3 pr-9 py-1.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden focus:border-[#4A2F18] bg-[#FBF8F5]"
@@ -266,10 +265,23 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-bold"
           >
-            <option value="all">كل حالات القيد (النشط والمنقطع)</option>
-            <option value="active">الطلاب المنتظمون (المقيدون فقط)</option>
-            <option value="dropped">الطلاب المنقطعون عن الدراسة</option>
-            <option value="suspended">المفصولون مؤقتاً (لائحة الغياب)</option>
+            <option value="all">كل حالات القيد</option>
+            <option value="active">الطلاب المنتظمون</option>
+            <option value="dropped">الطلاب المنقطعون</option>
+            <option value="suspended">المفصولون مؤقتاً</option>
+          </select>
+        </div>
+
+        {/* 👈 فلتر النوع الجديد */}
+        <div>
+          <select
+            value={genderFilter}
+            onChange={(e) => setGenderFilter(e.target.value)}
+            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
+          >
+            <option value="all">الجميع (بنين وبنات)</option>
+            <option value="male">بنين (ذكور)</option>
+            <option value="female">بنات (إناث)</option>
           </select>
         </div>
 
@@ -279,10 +291,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             onChange={(e) => setStageFilter(e.target.value)}
             className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
           >
-            <option value="all">جميع المراحل الدراسية</option>
-            <option value="primary">المرحلة الابتدائية (50 ج)</option>
-            <option value="prep">المرحلة الإعدادية (65 ج)</option>
-            <option value="secondary_up">الثانوية فما فوق (80 ج)</option>
+            <option value="all">جميع المراحل</option>
+            <option value="primary">ابتدائي (50 ج)</option>
+            <option value="prep">إعدادي (65 ج)</option>
+            <option value="secondary_up">ثانوي فما فوق (80 ج)</option>
           </select>
         </div>
 
@@ -292,7 +304,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             onChange={(e) => setGroupFilter(e.target.value)}
             className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
           >
-            <option value="all">جميع الحلقات والمجموعات</option>
+            <option value="all">جميع الحلقات</option>
             {groups.map(g => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
@@ -305,8 +317,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             onChange={(e) => setBannedFilter(e.target.value)}
             className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
           >
-            <option value="all">كافة حالات الدخول للبوابة</option>
-            <option value="banned">الممنوعون من الدخول فقط</option>
+            <option value="all">كافة حالات الدخول</option>
+            <option value="banned">الممنوعون فقط</option>
           </select>
         </div>
       </div>
@@ -359,6 +371,38 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 />
               </div>
 
+              {/* 👈 1.1 اختيار النوع (الجنس) بدون إيموجي */}
+              <div>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+                  النوع (الجنس) <span className="text-red-600">*</span>
+                </label>
+                <div className="flex items-center gap-6 bg-[#FBF8F5] p-2.5 rounded-lg border border-[#E8DCCF]">
+                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="studentGender"
+                      value="male"
+                      checked={gender === 'male'}
+                      onChange={() => setGender('male')}
+                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
+                    />
+                    <span>ذكر (طالب)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="studentGender"
+                      value="female"
+                      checked={gender === 'female'}
+                      onChange={() => setGender('female')}
+                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
+                    />
+                    <span>أنثى (طالبة)</span>
+                  </label>
+                </div>
+              </div>
+
               {/* 2. Educational Stage & Grade */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -386,7 +430,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 3. Core Departments & Groups Selection (القاعدة الجوهرية: قسمان مستقلان) */}
+              {/* 3. Core Departments & Groups Selection */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-3">
                 <div className="text-xs font-extrabold text-[#4A2F18] flex items-center justify-between">
                   <span>توزيع القسمين الأساسيين (مجموعة لكل قسم)</span>
@@ -541,7 +585,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 7. Agreement Checkbox (FR-04) */}
+              {/* 7. Agreement Checkbox */}
               <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -585,6 +629,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             <thead>
               <tr className="bg-[#F6EEE4] border-b border-[#E8DCCF] text-[#4A2F18] font-bold">
                 <th className="py-3 px-4">الطالب والاسم رباعي</th>
+                <th className="py-3 px-3">النوع</th> {/* 👈 عمود النوع */}
                 <th className="py-3 px-3">المرحلة والصف</th>
                 <th className="py-3 px-3">حلقة التحفيظ</th>
                 <th className="py-3 px-3">لقاء الجمعة (التربوي)</th>
@@ -598,7 +643,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             <tbody className="divide-y divide-[#E8DCCF]">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-[#8C6D53]">
+                  <td colSpan={10} className="py-8 text-center text-[#8C6D53]">
                     لا توجد سجلات مطابقة للبحث أو المرشحات المحددة.
                   </td>
                 </tr>
@@ -612,7 +657,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   return (
                     <tr key={student.id} className={`hover:bg-[#FDFBF9] transition ${student.status === 'dropped' ? 'bg-amber-50/20' : ''}`}>
                       
-                      {/* Name & Sibling Indicator & Dropout notes */}
+                      {/* Name & Sibling Indicator */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <button
@@ -643,6 +688,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
+                      {/* Gender Column */}
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                          student.gender === 'female' 
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
+                          {student.gender === 'female' ? 'أنثى' : 'ذكر'}
+                        </span>
+                      </td>
+
                       {/* Stage & Grade */}
                       <td className="py-3 px-3">
                         <span className="text-[#4A2F18] font-medium">{student.grade}</span>
@@ -668,7 +724,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         </span>
                       </td>
 
-                      {/* Enrollment Status Column */}
+                      {/* Enrollment Status */}
                       <td className="py-3 px-3">
                         {student.status === 'active' ? (
                           <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200 inline-block">
@@ -799,7 +855,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       </div>
 
-      {/* Modal: Record Student Dropout ("تسجيل انقطاع الطالب") */}
+      {/* Modal: Record Student Dropout */}
       {studentToDrop && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4">
@@ -854,7 +910,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       )}
 
-      {/* Modal: Permanent Deletion (للمدير فقط مع تأكيد شديد) */}
+      {/* Modal: Permanent Deletion */}
       {studentToDeletePermanent && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-red-200 shadow-xl p-5 space-y-4">
