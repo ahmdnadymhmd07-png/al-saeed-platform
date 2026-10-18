@@ -16,11 +16,11 @@ import {
 
 export const TeacherAttendanceView: React.FC = () => {
   const { 
-    teachers, 
+    teachers = [], 
     addTeacher,
-    groups, 
-    branches,
-    teacherAttendance, 
+    groups = [], 
+    branches = [],
+    teacherAttendance = [], 
     saveTeacherAttendance, 
     selectedBranchId, 
     currentUser 
@@ -34,7 +34,6 @@ export const TeacherAttendanceView: React.FC = () => {
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
   const [newFullName, setNewFullName] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newGender, setNewGender] = useState<'male' | 'female'>('male'); // إضافة حالة تحديد الجنس
   const [newBranchId, setNewBranchId] = useState<string>(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
   const [newDeptIds, setNewDeptIds] = useState<string[]>(['tahfeez']);
   const [newNotes, setNewNotes] = useState('');
@@ -42,7 +41,6 @@ export const TeacherAttendanceView: React.FC = () => {
   const handleOpenAddTeacher = () => {
     setNewFullName('');
     setNewPhone('');
-    setNewGender('male');
     setNewBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
     setNewDeptIds(['tahfeez']);
     setNewNotes('');
@@ -56,7 +54,6 @@ export const TeacherAttendanceView: React.FC = () => {
     addTeacher({
       fullName: newFullName.trim(),
       phone: newPhone.trim(),
-      gender: newGender, // إرسال الجنس المختار
       branchId: newBranchId || branches[0]?.id || 'b1',
       departmentIds: newDeptIds.length > 0 ? newDeptIds : ['tahfeez'],
       active: true,
@@ -64,8 +61,7 @@ export const TeacherAttendanceView: React.FC = () => {
     });
 
     setIsAddTeacherOpen(false);
-    const title = newGender === 'female' ? 'المعلمة' : 'الشيخ';
-    setSaveNotice(`تمت إضافة ${title} (${newFullName.trim()}) بنجاح إلى سجل الحضور.`);
+    setSaveNotice(`تمت إضافة (${newFullName.trim()}) بنجاح إلى سجل المعلمين.`);
   };
 
   // Filter teachers by branch
@@ -76,7 +72,7 @@ export const TeacherAttendanceView: React.FC = () => {
     });
   }, [teachers, selectedBranchId]);
 
-  // Form entries map: Record<teacherId, { status: 'present'|'absent'|'excused', checkIn: string, checkOut: string, excuseReason: string }>
+  // Form entries map
   const [entries, setEntries] = useState<Record<string, { status: 'present'|'absent'|'excused'; checkIn: string; checkOut: string; excuseReason: string }>>({});
 
   // Sync entries when date or branch changes
@@ -202,7 +198,7 @@ export const TeacherAttendanceView: React.FC = () => {
         <div className="p-4 bg-[#F6EEE4] border-b border-[#E8DCCF] flex items-center justify-between">
           <h3 className="text-xs font-bold text-[#4A2F18]">كشف معلمي الفرع (مرتب حسب تسلسل الدفتر)</h3>
           <span className="text-[11px] text-[#8C6D53]">
-            مدخل البيانات: {currentUser.fullName}
+            مدخل البيانات: {currentUser?.fullName || 'المشرف'}
           </span>
         </div>
 
@@ -229,7 +225,6 @@ export const TeacherAttendanceView: React.FC = () => {
             branchTeachers.map((teacher, index) => {
               const entry = entries[teacher.id] || { status: 'present', checkIn: '15:30', checkOut: '18:00' };
               const teacherGroups = groups.filter(g => g.teacherId === teacher.id);
-              const title = teacher.gender === 'female' ? 'المعلمة' : 'الشيخ';
 
               return (
                 <div key={teacher.id} className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-[#FDFBF9] transition">
@@ -240,9 +235,8 @@ export const TeacherAttendanceView: React.FC = () => {
                       {index + 1}
                     </span>
                     <div>
-                      <h4 className="font-bold text-xs text-[#4A2F18]">
-                        {title} / {teacher.fullName}
-                      </h4>
+                      {/* يعرض الاسم مباشرة كما تم إدخاله باللقب اليدوي */}
+                      <h4 className="font-bold text-xs text-[#4A2F18]">{teacher.fullName}</h4>
                       <div className="flex items-center gap-2 text-[11px] text-[#8C6D53] mt-0.5">
                         <span className="tabular-nums dir-ltr">{teacher.phone}</span>
                         <span>•</span>
@@ -285,7 +279,7 @@ export const TeacherAttendanceView: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Time fields (only if present) */}
+                    {/* Time fields */}
                     {entry.status === 'present' && (
                       <div className="flex items-center gap-3 text-xs">
                         <div className="flex items-center gap-1.5">
@@ -309,16 +303,16 @@ export const TeacherAttendanceView: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Excuse Reason Input (when status is excused) */}
+                    {/* Excuse Reason Input */}
                     {entry.status === 'excused' && (
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-amber-50 p-2 rounded-xl border border-amber-200">
                         <span className="text-[11px] font-bold text-amber-900 whitespace-nowrap">سبب العذر:</span>
                         <input
                           type="text"
-                          placeholder="بيان سبب العذر (إلزامي للتوثيق)..."
+                          placeholder="بيان سبب العذر..."
                           value={entry.excuseReason || ''}
                           onChange={(e) => updateTeacherEntry(teacher.id, { excuseReason: e.target.value })}
-                          className="px-2.5 py-1 text-xs rounded-lg border border-amber-300 bg-white text-[#4A2F18] min-w-[180px] focus:outline-hidden font-medium"
+                          className="px-2.5 py-1 text-xs rounded-lg border border-amber-300 bg-white text-[#4A2F18] min-w-[180px] font-medium"
                         />
                         <div className="flex items-center gap-1">
                           {['وعكة صحية', 'ظرف عائلي', 'مأمورية رسمية', 'عذر مسبق'].map(reason => (
@@ -358,45 +352,15 @@ export const TeacherAttendanceView: React.FC = () => {
 
             <form onSubmit={handleCreateTeacher} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم المعلم / المعلمة كاملاً *</label>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم المعلم / المعلمة كاملاً (مع اللقب إن وجد) *</label>
                 <input
                   type="text"
                   required
-                  placeholder="أدخل الاسم الثلاثي أو الرباعي..."
+                  placeholder="مثال: الشيخ مصطفى علي  أو  المعلمة إيمان شعبان"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-semibold text-xs focus:outline-none focus:border-[#4A2F18]"
                 />
-              </div>
-
-              {/* Gender Radio Selector */}
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">النوع / اللقب المعيار *</label>
-                <div className="flex items-center gap-4 bg-[#FBF8F5] p-2.5 rounded-xl border border-[#E8DCCF]">
-                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="male"
-                      checked={newGender === 'male'}
-                      onChange={() => setNewGender('male')}
-                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
-                    />
-                    <span>ذكر (الشيخ / ...)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="female"
-                      checked={newGender === 'female'}
-                      onChange={() => setNewGender('female')}
-                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
-                    />
-                    <span>أنثى (المعلمة / ...)</span>
-                  </label>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
