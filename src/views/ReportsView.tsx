@@ -385,12 +385,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
       </div>
 
       {/* ========================================================================= */}
-      {/* PRINTABLE SHEET CONTAINER (A4 FORMATTED)                                  */}
+      {/* PRINTABLE SHEET CONTAINER (A4 FORMATTED)                                 */}
       {/* ========================================================================= */}
       <div 
         contentEditable={isEditable} 
         suppressContentEditableWarning={true}
-        className={`bg-[#FFFFFF] p-8 sm:p-10 rounded-2xl border border-[#E8DCCF] shadow-sm print:shadow-none print:border-none print:p-0 text-black transition-all ${
+        className={`printable-area bg-[#FFFFFF] p-8 sm:p-10 rounded-2xl border border-[#E8DCCF] shadow-sm print:shadow-none print:border-none print:p-0 text-black transition-all ${
           isEditable ? 'ring-2 ring-amber-400/40' : ''
         }`}
       >
@@ -433,13 +433,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         </div>
 
-
-
-
-
-        {/* ======================================================================= */}
-        {/* DOCUMENT 3: CLASSROOM PAPER ATTENDANCE ROLL SHEET (كشف تحضير الحلقة)     */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 3: CLASSROOM PAPER ATTENDANCE ROLL SHEET */}
         {activeReportType === 'paper_roll' && (
           <div className="space-y-4">
             <div className="text-center border-b-2 border-black pb-2">
@@ -477,19 +471,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                     <td className="py-1 px-2 border-l border-black font-bold text-black text-xs">{s.fullName}</td>
                     <td className="py-1 px-1 border-l border-black text-center">{s.grade}</td>
                     {Array.from({ length: 12 }).map((_, i) => (
-                      <td key={i} className="py-1 px-0.5 border-l border-black text-center">
-                        {/* Empty box for teacher pen checkmark */}
-                      </td>
+                      <td key={i} className="py-1 px-0.5 border-l border-black text-center"></td>
                     ))}
-                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">
-                      ......
-                    </td>
-                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">
-                      ......
-                    </td>
-                    <td className="py-1 px-2 text-[9px] text-gray-400">
-                      ...................
-                    </td>
+                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
+                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
+                    <td className="py-1 px-2 text-[9px] text-gray-400">...................</td>
                   </tr>
                 ))}
               </tbody>
@@ -502,9 +488,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT: GUARDIAN SUMMONS WITH TEAR-OFF RECEIPT (استدعاء ولي الأمر)     */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT: GUARDIAN SUMMONS */}
         {activeReportType === 'guardian_summons' && targetStudent && (
           <div className="space-y-6">
             <div className="text-center border-b-2 border-black pb-2">
@@ -581,9 +565,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT 7: GATEKEEPER BANNED STUDENTS (كشف أمن البوابة)                 */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 7: GATEKEEPER BANNED STUDENTS */}
         {activeReportType === 'gatekeeper' && (
           <div className="space-y-4">
             <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 flex items-center justify-between text-red-900">
@@ -637,9 +619,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT 8: STUDENTS GENERAL LIST (كشف قيد الطلاب العام)                 */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 8: STUDENTS GENERAL LIST */}
         {activeReportType === 'students' && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-black border-b border-black pb-2">
@@ -676,13 +656,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT 9: FINANCIAL DUES & COLLECTIONS (كشف التحصيل المالي)           */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 9: FINANCIAL DUES */}
         {activeReportType === 'finance' && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-black border-b border-black pb-2">
-              تقرير الاستحقاقات المالية والتحصيل والمتأخرات
+              تقرير الاستحقاقات المالية والتحصيل ومتأخرات الطلاب
             </h3>
             <table className="w-full text-right border-collapse text-xs border border-black">
               <thead>
@@ -717,9 +695,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT 10: BRANCH COMPARISON                                          */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 10: BRANCH COMPARISON */}
         {activeReportType === 'branch_comparison' && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-black border-b border-black pb-2">
@@ -769,9 +745,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         )}
 
-        {/* ======================================================================= */}
-        {/* DOCUMENT 11: TEACHERS ATTENDANCE ROLL                                   */}
-        {/* ======================================================================= */}
+        {/* DOCUMENT 11: TEACHERS ATTENDANCE ROLL */}
         {activeReportType === 'teachers' && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-black border-b border-black pb-2">
