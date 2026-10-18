@@ -75,7 +75,6 @@ export interface Student {
   id: string;
   branchId: string;
   fullName: string; // 4-part name
-  gender?: 'male' | 'female';
   grade: string;    // الصف الثالث الابتدائي، إلخ
   stage: EducationalStage;
   guardianPhone: string; // formatted +201...
