@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Student, Payment } from '../types';
-import { Printer, X } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
 interface PrintModalProps {
   type: 'admission' | 'receipt' | 'gatekeeper' | null;
@@ -17,7 +17,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
     selectedBranchId, 
     students, 
     groups, 
-    teachers, 
     checkStudentBan 
   } = useApp();
 
@@ -30,6 +29,8 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
   const handlePrint = () => {
     window.print();
   };
+
+  const isFemale = student?.gender === 'female';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -78,24 +79,27 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
             <div className="space-y-4">
               <div className="text-center pb-2 border-b border-[#E8DCCF]">
                 <h3 className="text-sm font-black text-[#4A2F18]">
-                  استمارة التحاق طالب وإقرار الالتزام بالشروط واللوائح
+                  استمارة التحاق {isFemale ? 'طالبة' : 'طالب'} وإقرار الالتزام بالشروط واللوائح
                 </h3>
                 <span className="text-[11px] text-[#8C6D53]">العام الدراسي 2026-2027 م / 1447-1448 هـ</span>
               </div>
 
+              {/* جدول البيانات الشخصية متضمناً النوع */}
               <div className="grid grid-cols-2 gap-3 bg-[#FBF8F5] p-3.5 rounded-xl border border-[#E8DCCF] text-xs">
                 <div><span>الاسم رباعي:</span> <strong className="text-[#4A2F18]">{student.fullName}</strong></div>
+                <div><span>النوع (الجنس):</span> <strong className="text-[#4A2F18]">{isFemale ? 'أنثى' : 'ذكر'}</strong></div>
                 <div><span>الصف والمرحلة:</span> <strong className="text-[#4A2F18]">{student.grade}</strong></div>
                 <div><span>رقم ولي الأمر:</span> <strong className="tabular-nums dir-ltr text-right">{student.guardianPhone}</strong></div>
                 <div><span>تاريخ الالتحاق:</span> <strong className="tabular-nums">{student.joinDate}</strong></div>
-                <div><span>حلقة التحفيظ:</span> <strong>{groups.find(g => g.id === student.tahfeezGroupId)?.name}</strong></div>
-                <div><span>لقاء الجمعة التربوي:</span> <strong>{groups.find(g => g.id === student.tarbawiGroupId)?.name}</strong></div>
+                <div><span>حلقة التحفيظ:</span> <strong>{groups.find(g => g.id === student.tahfeezGroupId)?.name || '—'}</strong></div>
+                <div className="col-span-2"><span>لقاء الجمعة التربوي:</span> <strong>{groups.find(g => g.id === student.tarbawiGroupId)?.name || '—'}</strong></div>
               </div>
 
+              {/* التعهد والإقرار مع ضبط التذكير والتأنيث */}
               <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] text-[11px] leading-relaxed space-y-1">
                 <span className="font-bold text-[#4A2F18] block text-xs">إقرار وتعهد ولي الأمر:</span>
                 <p>
-                  أقر أنا ولي أمر الطالب المذكور أعلاه باطلاعي على شروط ولوائح مدرسة السعيد القرآنية المعتمدة، وأتعهد بالآتي:
+                  أقر أنا ولي أمر {isFemale ? 'الطالبة المذكورة' : 'الطالب المذكور'} أعلاه باطلاعي على شروط ولوائح مدرسة السعيد القرآنية المعتمدة، وأتعهد بالآتي:
                 </p>
                 <ol className="list-decimal list-inside space-y-0.5 text-[#6D4C3D] pr-2">
                   <li>الالتزام بحضور قسمي التحفيظ ولقاء الجمعة التربوي بانتظام.</li>
@@ -178,6 +182,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
                   <tr className="bg-red-100 text-red-900 font-bold border-b border-red-200">
                     <th className="py-2 px-3 border-l border-red-200 text-center w-10">م</th>
                     <th className="py-2 px-4 border-l border-red-200">اسم الطالب</th>
+                    <th className="py-2 px-3 border-l border-red-200">النوع</th>
                     <th className="py-2 px-3 border-l border-red-200">الصف</th>
                     <th className="py-2 px-3 border-l border-red-200">رقم ولي الأمر</th>
                     <th className="py-2 px-4">سبب المنع والإجراء المطلوب</th>
@@ -186,7 +191,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
                 <tbody className="divide-y divide-[#E8DCCF]">
                   {bannedList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-emerald-800 font-bold">
+                      <td colSpan={6} className="py-6 text-center text-emerald-800 font-bold">
                         لا يوجد أي طالب ممنوع من الدخول اليوم.
                       </td>
                     </tr>
@@ -195,6 +200,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
                       <tr key={s.id}>
                         <td className="py-2 px-3 border-l border-[#E8DCCF] text-center font-bold tabular-nums">{idx + 1}</td>
                         <td className="py-2 px-4 border-l border-[#E8DCCF] font-bold text-[#4A2F18]">{s.fullName}</td>
+                        <td className="py-2 px-3 border-l border-[#E8DCCF]">{s.gender === 'female' ? 'أنثى' : 'ذكر'}</td>
                         <td className="py-2 px-3 border-l border-[#E8DCCF]">{s.grade}</td>
                         <td className="py-2 px-3 border-l border-[#E8DCCF] tabular-nums dir-ltr text-right">{s.guardianPhone}</td>
                         <td className="py-2 px-4 text-red-700 font-bold">{checkStudentBan(s.id).details}</td>
