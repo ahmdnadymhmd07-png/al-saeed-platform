@@ -2,24 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { TeacherAttendanceSource } from '../types';
 import { 
-  Clock, 
   Check, 
-  X, 
-  HelpCircle, 
-  Calendar, 
   Save, 
-  FileText,
-  AlertCircle,
-  UserPlus,
-  Building2
+  UserCheck
 } from 'lucide-react';
 
 export const TeacherAttendanceView: React.FC = () => {
   const { 
     teachers = [], 
-    addTeacher,
     groups = [], 
-    branches = [],
     teacherAttendance = [], 
     saveTeacherAttendance, 
     selectedBranchId, 
@@ -30,47 +21,32 @@ export const TeacherAttendanceView: React.FC = () => {
   const [source, setSource] = useState<TeacherAttendanceSource>('register');
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
-  // Quick Add Teacher Modal State
-  const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
-  const [newFullName, setNewFullName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newBranchId, setNewBranchId] = useState<string>(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
-  const [newDeptIds, setNewDeptIds] = useState<string[]>(['tahfeez']);
-  const [newNotes, setNewNotes] = useState('');
+  // 1. تحديد اسم اليوم باللغة العربية بناءً على التاريخ المحدد
+  const selectedDayName = useMemo(() => {
+    if (!selectedDate) return '';
+    const dateObj = new Date(selectedDate);
+    const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    return days[dateObj.getDay()];
+  }, [selectedDate]);
 
-  const handleOpenAddTeacher = () => {
-    setNewFullName('');
-    setNewPhone('');
-    setNewBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
-    setNewDeptIds(['tahfeez']);
-    setNewNotes('');
-    setIsAddTeacherOpen(true);
-  };
-
-  const handleCreateTeacher = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFullName.trim()) return;
-
-    addTeacher({
-      fullName: newFullName.trim(),
-      phone: newPhone.trim(),
-      branchId: newBranchId || branches[0]?.id || 'b1',
-      departmentIds: newDeptIds.length > 0 ? newDeptIds : ['tahfeez'],
-      active: true,
-      notes: newNotes.trim()
-    });
-
-    setIsAddTeacherOpen(false);
-    setSaveNotice(`تمت إضافة (${newFullName.trim()}) بنجاح إلى سجل المعلمين.`);
-  };
-
-  // Filter teachers by branch
+  // 2. تصفية المعلمين: يظهر فقط المعلم الذي لديه مجموعة/حلقة مجدولة في يوم التاريخ المحدد
   const branchTeachers = useMemo(() => {
-    return teachers.filter(t => {
-      if (selectedBranchId !== 'all' && t.branchId !== selectedBranchId) return false;
-      return t.active;
+    return teachers.filter(teacher => {
+      // التصفية حسب الفرع
+      if (selectedBranchId !== 'all' && teacher.branchId !== selectedBranchId) return false;
+      // التأكد من أن حساب المعلم نشط
+      if (!teacher.active) return false;
+
+      // البحث عن المجموعات المسندة لهذا المعلم والتي تعمل في اليوم المحدد (مثلاً "الأحد")
+      const hasGroupToday = groups.some(group => {
+        const isTeacherForGroup = group.teacherId === teacher.id;
+        const runsOnSelectedDay = group.days && group.days.includes(selectedDayName);
+        return isTeacherForGroup && runsOnSelectedDay;
+      });
+
+      return hasGroupToday;
     });
-  }, [teachers, selectedBranchId]);
+  }, [teachers, groups, selectedBranchId, selectedDayName]);
 
   // Form entries map
   const [entries, setEntries] = useState<Record<string, { status: 'present'|'absent'|'excused'; checkIn: string; checkOut: string; excuseReason: string }>>({});
@@ -125,7 +101,7 @@ export const TeacherAttendanceView: React.FC = () => {
       });
     });
 
-    setSaveNotice(`تم حفظ دفتر حضور المعلمين ليوم ${selectedDate} بنجاح مع توثيق أسباب الأعذار وساعات العمل.`);
+    setSaveNotice(`تم حفظ دفتر حضور المعلمين ليوم ${selectedDayName} (${selectedDate}) بنجاح.`);
   };
 
   return (
@@ -137,21 +113,15 @@ export const TeacherAttendanceView: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-[#4A2F18]">دفتر حضور وانصراف المعلمين والمحفظين</h2>
             <p className="text-xs text-[#8C6D53]">
-              نقل البيانات من الدفتر الورقي لحساب ساعات الحصص ودقائق التأخير ومعدل الالتزام
+              عرض المعلمين المجدولين ليوم <strong className="text-[#4A2F18]">({selectedDayName})</strong> وتوثيق ساعات العمل والحضور.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleOpenAddTeacher}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] border border-[#E8DCCF] rounded-xl text-xs font-bold transition cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-[#8C6D53]" />
-              <span>إضافة معلم جديد</span>
-            </button>
-            <button
               onClick={handleSaveAll}
-              className="flex items-center gap-2 px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border border-[#4A2F18]"
+              disabled={branchTeachers.length === 0}
+              className="flex items-center gap-2 px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border border-[#4A2F18]"
             >
               <Save className="w-4 h-4 text-[#D8C3AE]" />
               <span>حفظ سجل اليوم</span>
@@ -162,7 +132,9 @@ export const TeacherAttendanceView: React.FC = () => {
         {/* Date & Source selectors */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-[#4A2F18] mb-1">تاريخ الحضور</label>
+            <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+              تاريخ الحضور <span className="text-[#8C6D53]">({selectedDayName})</span>
+            </label>
             <input
               type="date"
               value={selectedDate}
@@ -196,7 +168,9 @@ export const TeacherAttendanceView: React.FC = () => {
       {/* Teachers Attendance Input Grid */}
       <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs">
         <div className="p-4 bg-[#F6EEE4] border-b border-[#E8DCCF] flex items-center justify-between">
-          <h3 className="text-xs font-bold text-[#4A2F18]">كشف معلمي الفرع (مرتب حسب تسلسل الدفتر)</h3>
+          <h3 className="text-xs font-bold text-[#4A2F18]">
+            كشف المعلمين المجدولين ليوم {selectedDayName} ({branchTeachers.length})
+          </h3>
           <span className="text-[11px] text-[#8C6D53]">
             مدخل البيانات: {currentUser?.fullName || 'المشرف'}
           </span>
@@ -206,25 +180,17 @@ export const TeacherAttendanceView: React.FC = () => {
           {branchTeachers.length === 0 ? (
             <div className="p-10 text-center text-xs text-[#8C6D53] space-y-3">
               <div className="w-12 h-12 rounded-full bg-[#F6EEE4] text-[#8C6D53] flex items-center justify-center mx-auto border border-[#E8DCCF]">
-                <UserPlus className="w-6 h-6" />
+                <UserCheck className="w-6 h-6" />
               </div>
-              <p className="font-bold text-[#4A2F18] text-sm">لا يوجد معلمون مسجلون في هذا الفرع حالياً</p>
+              <p className="font-bold text-[#4A2F18] text-sm">لا يوجد معلمون لديهم حلقات مجدولة يوم {selectedDayName}</p>
               <p className="text-[11px] max-w-sm mx-auto">
-                يمكنك إضافة المعلمين والمحفظين للفرع الآن للبدء في توثيق الحضور والغياب وساعات الحصص.
+                يتم عرض المعلمين الذين لديهم حلقات أو مجموعات عمل مخصصة في جدول يوم ({selectedDayName}) فقط.
               </p>
-              <button
-                type="button"
-                onClick={handleOpenAddTeacher}
-                className="mt-1 px-4 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <UserPlus className="w-4 h-4 text-[#D8C3AE]" />
-                <span>إضافة أول معلم الآن</span>
-              </button>
             </div>
           ) : (
             branchTeachers.map((teacher, index) => {
               const entry = entries[teacher.id] || { status: 'present', checkIn: '15:30', checkOut: '18:00' };
-              const teacherGroups = groups.filter(g => g.teacherId === teacher.id);
+              const teacherGroupsToday = groups.filter(g => g.teacherId === teacher.id && g.days && g.days.includes(selectedDayName));
 
               return (
                 <div key={teacher.id} className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-[#FDFBF9] transition">
@@ -235,12 +201,13 @@ export const TeacherAttendanceView: React.FC = () => {
                       {index + 1}
                     </span>
                     <div>
-                      {/* يعرض الاسم مباشرة كما تم إدخاله باللقب اليدوي */}
                       <h4 className="font-bold text-xs text-[#4A2F18]">{teacher.fullName}</h4>
                       <div className="flex items-center gap-2 text-[11px] text-[#8C6D53] mt-0.5">
                         <span className="tabular-nums dir-ltr">{teacher.phone}</span>
                         <span>•</span>
-                        <span>{teacherGroups.length} مجموعات وحلقات مسندة</span>
+                        <span className="text-emerald-800 font-semibold">
+                          حلقات اليوم: {teacherGroupsToday.map(g => g.name).join('، ')}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -337,120 +304,6 @@ export const TeacherAttendanceView: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Modal: Quick Add Teacher */}
-      {isAddTeacherOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] my-auto">
-            <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="text-sm font-bold">إضافة معلم / معلمة جديد</h3>
-              </div>
-              <button onClick={() => setIsAddTeacherOpen(false)} className="text-white hover:text-red-200 font-bold px-2 cursor-pointer">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateTeacher} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم المعلم / المعلمة كاملاً (مع اللقب إن وجد) *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: الشيخ مصطفى علي  أو  المعلمة إيمان شعبان"
-                  value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-semibold text-xs focus:outline-none focus:border-[#4A2F18]"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">رقم الهاتف / الواتساب</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: 01012345678"
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-mono text-xs focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">الفرع المخصص *</label>
-                  <select
-                    value={newBranchId}
-                    onChange={(e) => setNewBranchId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-bold text-xs focus:outline-none"
-                  >
-                    {branches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Departments */}
-              <div className="space-y-1.5 p-3 bg-[#FBF8F5] rounded-xl border border-[#E8DCCF]">
-                <label className="block text-xs font-bold text-[#4A2F18]">الأقسام التي يُدرّس بها:</label>
-                <div className="flex items-center gap-4 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-[#4A2F18]">
-                    <input
-                      type="checkbox"
-                      checked={newDeptIds.includes('tahfeez')}
-                      onChange={(e) => {
-                        if (e.target.checked) setNewDeptIds(prev => [...prev, 'tahfeez']);
-                        else setNewDeptIds(prev => prev.filter(d => d !== 'tahfeez'));
-                      }}
-                      className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
-                    />
-                    <span>قسم تحفيظ القرآن الكريم</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-[#4A2F18]">
-                    <input
-                      type="checkbox"
-                      checked={newDeptIds.includes('tarbawi')}
-                      onChange={(e) => {
-                        if (e.target.checked) setNewDeptIds(prev => [...prev, 'tarbawi']);
-                        else setNewDeptIds(prev => prev.filter(d => d !== 'tarbawi'));
-                      }}
-                      className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
-                    />
-                    <span>قسم النشاط التربوي</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">ملاحظات ومؤهلات</label>
-                <textarea
-                  rows={2}
-                  placeholder="إجازات قرآنية، مؤهل أزهري، ملاحظات..."
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] text-xs focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[#E8DCCF] flex items-center justify-end gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsAddTeacherOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold cursor-pointer"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-xl font-bold transition shadow-xs cursor-pointer"
-                >
-                  حفظ المعلم
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
