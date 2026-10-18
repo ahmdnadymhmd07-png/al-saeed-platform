@@ -54,6 +54,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [studentToDeletePermanent, setStudentToDeletePermanent] = useState<Student | null>(null);
 
   // Form state
+  const [studentBranchId, setStudentBranchId] = useState<string>(
+    selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
+  );
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male'); // 👈 حالة النوع في الاستمارة
   const [stage, setStage] = useState<EducationalStage>('primary');
@@ -149,10 +152,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       return;
     }
 
-    const branchToAssign = selectedBranchId === 'all' ? (branches[0]?.id || 'b1') : selectedBranchId;
-
     const newStudent = addStudent({
-      branchId: branchToAssign,
+      branchId: studentBranchId, // 👈 إسناد الفرع المقتطَع من اختيار الاستمارة
       fullName: fullName.trim(),
       gender, // 👈 إرسال النوع أثناء حفظ الطالب
       grade,
@@ -236,7 +237,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
           
           {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
             <button
-              onClick={() => setIsFormOpen(true)}
+              onClick={() => {
+                setStudentBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
+                setIsFormOpen(true);
+              }}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <UserPlus className="w-4 h-4 text-[#D8C3AE]" />
@@ -356,6 +360,22 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               )}
 
+              {/* 0. Branch Selection */}
+              <div>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+                  الفرع / المدرسة المخصصة <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={studentBranchId}
+                  onChange={(e) => setStudentBranchId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5] font-bold text-[#4A2F18]"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* 1. Full 4-part name */}
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">
@@ -445,7 +465,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                     onChange={(e) => setTahfeezGroupId(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[#E8DCCF] mb-1.5"
                   >
-                    {groups.filter(g => g.departmentId === 'tahfeez').map(g => (
+                    {groups.filter(g => g.departmentId === 'tahfeez' && (g.branchId === studentBranchId || !g.branchId)).map(g => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                   </select>
@@ -463,7 +483,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                     onChange={(e) => setTarbawiGroupId(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[#E8DCCF] mb-1.5"
                   >
-                    {groups.filter(g => g.departmentId === 'tarbawi').map(g => (
+                    {groups.filter(g => g.departmentId === 'tarbawi' && (g.branchId === studentBranchId || !g.branchId)).map(g => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                   </select>
