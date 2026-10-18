@@ -826,7 +826,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                           </div>
                           <div>
                             <h4 className="font-extrabold text-xs sm:text-sm text-[#4A2F18]">
-                              الشيخ / {teacher.fullName}
+                              {teacher.fullName}
                             </h4>
                             <div className="flex items-center gap-1.5 text-[11px] text-[#8C6D53] mt-0.5">
                               <Building2 className="w-3 h-3 text-[#8C6D53]" />
