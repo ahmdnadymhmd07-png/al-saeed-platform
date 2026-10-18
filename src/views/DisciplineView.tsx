@@ -21,9 +21,9 @@ interface DisciplineViewProps {
 
 export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }) => {
   const { 
-    disciplineCases, 
-    students, 
-    dues, 
+    disciplineCases = [], 
+    students = [], 
+    dues = [], 
     recordGuardianAttendance, 
     adminExceptionalUnban, 
     currentUser, 
@@ -44,11 +44,11 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
 
   // Edit discipline thresholds modal state
   const [isEditThresholdsOpen, setIsEditThresholdsOpen] = useState(false);
-  const [lvl1Limit, setLvl1Limit] = useState(settings.absenceThresholds.level1);
-  const [lvl2Limit, setLvl2Limit] = useState(settings.absenceThresholds.level2);
-  const [lvl2Fine, setLvl2Fine] = useState(settings.absenceFineAmount);
-  const [lvl3Limit, setLvl3Limit] = useState(settings.absenceThresholds.level3);
-  const [suspMonths, setSuspMonths] = useState(settings.suspensionMonths);
+  const [lvl1Limit, setLvl1Limit] = useState(settings?.absenceThresholds?.level1 || 3);
+  const [lvl2Limit, setLvl2Limit] = useState(settings?.absenceThresholds?.level2 || 5);
+  const [lvl2Fine, setLvl2Fine] = useState(settings?.absenceFineAmount || 50);
+  const [lvl3Limit, setLvl3Limit] = useState(settings?.absenceThresholds?.level3 || 8);
+  const [suspMonths, setSuspMonths] = useState(settings?.suspensionMonths || 1);
 
   // Filter cases
   const filteredCases = disciplineCases.filter(c => {
@@ -88,18 +88,18 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
           <div>
             <h2 className="text-base font-bold text-[#4A2F18]">شؤون الانضباط ومتابعة الغياب التراكمي</h2>
             <p className="text-xs text-[#8C6D53]">
-              متابعة حدود الغياب ({settings.absenceThresholds.level1} حصص: استدعاء • {settings.absenceThresholds.level2} حصص: غرامة {settings.absenceFineAmount} ج • {settings.absenceThresholds.level3} حصص: فصل مؤقت {settings.suspensionMonths} شهر)
+              متابعة حدود الغياب ({settings?.absenceThresholds?.level1} حصص: استدعاء • {settings?.absenceThresholds?.level2} حصص: غرامة {settings?.absenceFineAmount} ج • {settings?.absenceThresholds?.level3} حصص: فصل مؤقت {settings?.suspensionMonths} شهر)
             </p>
           </div>
 
-          {currentUser.role === 'admin' && (
+          {currentUser?.role === 'admin' && (
             <button
               onClick={() => {
-                setLvl1Limit(settings.absenceThresholds.level1);
-                setLvl2Limit(settings.absenceThresholds.level2);
-                setLvl2Fine(settings.absenceFineAmount);
-                setLvl3Limit(settings.absenceThresholds.level3);
-                setSuspMonths(settings.suspensionMonths);
+                setLvl1Limit(settings?.absenceThresholds?.level1 || 3);
+                setLvl2Limit(settings?.absenceThresholds?.level2 || 5);
+                setLvl2Fine(settings?.absenceFineAmount || 50);
+                setLvl3Limit(settings?.absenceThresholds?.level3 || 8);
+                setSuspMonths(settings?.suspensionMonths || 1);
                 setIsEditThresholdsOpen(true);
               }}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
@@ -115,7 +115,7 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
           
           <div className="p-3 bg-orange-50/80 border border-orange-200 rounded-xl">
             <div className="flex items-center justify-between">
-              <span className="font-extrabold text-orange-900">المستوى الأول ({settings.absenceThresholds.level1} حصص غياب)</span>
+              <span className="font-extrabold text-orange-900">المستوى الأول ({settings?.absenceThresholds?.level1} حصص غياب)</span>
               <span className="text-[10px] bg-orange-200 text-orange-900 px-1.5 py-0.5 rounded font-bold">إنذار أول</span>
             </div>
             <p className="text-[11px] text-orange-800 mt-1 leading-relaxed">
@@ -125,21 +125,21 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
 
           <div className="p-3 bg-red-50/80 border border-red-200 rounded-xl">
             <div className="flex items-center justify-between">
-              <span className="font-extrabold text-red-900">المستوى الثاني ({settings.absenceThresholds.level2} حصص غياب)</span>
+              <span className="font-extrabold text-red-900">المستوى الثاني ({settings?.absenceThresholds?.level2} حصص غياب)</span>
               <span className="text-[10px] bg-red-200 text-red-900 px-1.5 py-0.5 rounded font-bold">غرامة + منع</span>
             </div>
             <p className="text-[11px] text-red-800 mt-1 leading-relaxed">
-              إضافة غرامة {settings.absenceFineAmount} ج على الحساب المالي، ولا يرفع المنع إلا بحضور ولي الأمر وسداد الغرامة.
+              إضافة غرامة {settings?.absenceFineAmount} ج على الحساب المالي، ولا يرفع المنع إلا بحضور ولي الأمر وسداد الغرامة.
             </p>
           </div>
 
           <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl">
             <div className="flex items-center justify-between">
-              <span className="font-extrabold text-purple-900">المستوى الثالث ({settings.absenceThresholds.level3} حصص غياب)</span>
+              <span className="font-extrabold text-purple-900">المستوى الثالث ({settings?.absenceThresholds?.level3} حصص غياب)</span>
               <span className="text-[10px] bg-purple-200 text-purple-900 px-1.5 py-0.5 rounded font-bold">فصل مؤقت</span>
             </div>
             <p className="text-[11px] text-purple-800 mt-1 leading-relaxed">
-              فصل مؤقت لمدة {settings.suspensionMonths} شهر؛ يختفي من كشوف التحضير، وتتوقف الاستحقاقات، ويُحسب تاريخ العودة.
+              فصل مؤقت لمدة {settings?.suspensionMonths} شهر؛ يختفي من كشوف التحضير، وتتوقف الاستحقاقات، ويُحسب تاريخ العودة.
             </p>
           </div>
 
@@ -187,7 +187,7 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
                   const student = students.find(s => s.id === c.studentId);
                   const fineDue = dues.find(d => d.id === c.fineDueId);
                   const isFinePaid = fineDue?.status === 'paid';
-                  const banInfo = checkStudentBan(c.studentId);
+                  const banInfo = checkStudentBan ? checkStudentBan(c.studentId) : { isBanned: false };
 
                   return (
                     <tr key={c.id} className="hover:bg-[#FDFBF9] transition">
@@ -216,7 +216,7 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
                       <td className="py-3 px-3">
                         {c.level >= 2 ? (
                           <div className="flex items-center gap-1 font-bold">
-                            <span className="tabular-nums">50 ج</span>
+                            <span className="tabular-nums">{settings?.absenceFineAmount || 50} ج</span>
                             <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
                               isFinePaid ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                             }`}>
@@ -262,7 +262,7 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
                           )}
 
                           {/* Admin Exceptional Override Button */}
-                          {currentUser.role === 'admin' && c.status === 'open' && (
+                          {currentUser?.role === 'admin' && c.status === 'open' && (
                             <button
                               onClick={() => {
                                 setActiveCaseForAdminUnban(c);
@@ -289,8 +289,8 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
 
       {/* Record Guardian Modal */}
       {activeCaseForGuardian && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#FFFFFF] w-full max-w-md rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-4 overflow-y-auto pt-10 sm:pt-4">
+          <div className="bg-[#FFFFFF] w-full max-w-md rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto">
             <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between">
               <h3 className="text-sm font-bold">تسجيل حضور ولي الأمر لرفع الاستدعاء</h3>
               <button onClick={() => setActiveCaseForGuardian(null)} className="text-white hover:text-red-200 font-bold px-2 cursor-pointer">
@@ -349,8 +349,8 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
 
       {/* Admin Override Modal */}
       {activeCaseForAdminUnban && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#FFFFFF] w-full max-w-md rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-4 overflow-y-auto pt-10 sm:pt-4">
+          <div className="bg-[#FFFFFF] w-full max-w-md rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto">
             <div className="bg-red-800 p-4 text-white flex items-center justify-between">
               <h3 className="text-sm font-bold">رفع المنع استثنائياً بقرار المدير (سجل رقابي)</h3>
               <button onClick={() => setActiveCaseForAdminUnban(null)} className="text-white hover:text-red-200 font-bold px-2 cursor-pointer">
@@ -397,16 +397,16 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
         </div>
       )}
 
-      {/* MODAL: EDIT DISCIPLINE THRESHOLDS & FINES */}
+      {/* MODAL: EDIT DISCIPLINE THRESHOLDS & FINES (تم تعديل الهيكل لمنع القطع) */}
       {isEditThresholdsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-4 overflow-y-auto pt-8 pb-8">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto my-auto">
+            <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-3 sticky top-0 bg-white z-10 pt-1">
               <div className="flex items-center gap-2 text-[#4A2F18]">
                 <Sliders className="w-5 h-5 text-[#B9895B]" />
                 <h3 className="font-bold text-sm">تعديل مستويات ولائحة الانضباط المدرسي</h3>
               </div>
-              <button onClick={() => setIsEditThresholdsOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setIsEditThresholdsOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer font-bold px-1">✕</button>
             </div>
 
             <form onSubmit={(e) => {
@@ -507,17 +507,17 @@ export const DisciplineView: React.FC<DisciplineViewProps> = ({ onOpenWhatsApp }
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#E8DCCF]">
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#E8DCCF] sticky bottom-0 bg-white pb-1">
                 <button
                   type="button"
                   onClick={() => setIsEditThresholdsOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg"
+                  className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg shadow-xs flex items-center gap-1.5"
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4 text-[#D8C3AE]" />
                   <span>اعتماد اللائحة الجديدة</span>
