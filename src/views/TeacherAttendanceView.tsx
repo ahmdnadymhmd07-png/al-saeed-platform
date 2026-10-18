@@ -34,6 +34,7 @@ export const TeacherAttendanceView: React.FC = () => {
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
   const [newFullName, setNewFullName] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newGender, setNewGender] = useState<'male' | 'female'>('male'); // إضافة حالة تحديد الجنس
   const [newBranchId, setNewBranchId] = useState<string>(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
   const [newDeptIds, setNewDeptIds] = useState<string[]>(['tahfeez']);
   const [newNotes, setNewNotes] = useState('');
@@ -41,6 +42,7 @@ export const TeacherAttendanceView: React.FC = () => {
   const handleOpenAddTeacher = () => {
     setNewFullName('');
     setNewPhone('');
+    setNewGender('male');
     setNewBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
     setNewDeptIds(['tahfeez']);
     setNewNotes('');
@@ -54,6 +56,7 @@ export const TeacherAttendanceView: React.FC = () => {
     addTeacher({
       fullName: newFullName.trim(),
       phone: newPhone.trim(),
+      gender: newGender, // إرسال الجنس المختار
       branchId: newBranchId || branches[0]?.id || 'b1',
       departmentIds: newDeptIds.length > 0 ? newDeptIds : ['tahfeez'],
       active: true,
@@ -61,7 +64,8 @@ export const TeacherAttendanceView: React.FC = () => {
     });
 
     setIsAddTeacherOpen(false);
-    setSaveNotice(`تمت إضافة المعلم الشيخ (${newFullName.trim()}) بنجاح إلى سجل الحضور.`);
+    const title = newGender === 'female' ? 'المعلمة' : 'الشيخ';
+    setSaveNotice(`تمت إضافة ${title} (${newFullName.trim()}) بنجاح إلى سجل الحضور.`);
   };
 
   // Filter teachers by branch
@@ -225,6 +229,7 @@ export const TeacherAttendanceView: React.FC = () => {
             branchTeachers.map((teacher, index) => {
               const entry = entries[teacher.id] || { status: 'present', checkIn: '15:30', checkOut: '18:00' };
               const teacherGroups = groups.filter(g => g.teacherId === teacher.id);
+              const title = teacher.gender === 'female' ? 'المعلمة' : 'الشيخ';
 
               return (
                 <div key={teacher.id} className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-[#FDFBF9] transition">
@@ -235,7 +240,9 @@ export const TeacherAttendanceView: React.FC = () => {
                       {index + 1}
                     </span>
                     <div>
-                      <h4 className="font-bold text-xs text-[#4A2F18]">{teacher.fullName}</h4>
+                      <h4 className="font-bold text-xs text-[#4A2F18]">
+                        {title} / {teacher.fullName}
+                      </h4>
                       <div className="flex items-center gap-2 text-[11px] text-[#8C6D53] mt-0.5">
                         <span className="tabular-nums dir-ltr">{teacher.phone}</span>
                         <span>•</span>
@@ -344,22 +351,52 @@ export const TeacherAttendanceView: React.FC = () => {
             <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="text-sm font-bold">إضافة معلم / محفظ جديد</h3>
+                <h3 className="text-sm font-bold">إضافة معلم / معلمة جديد</h3>
               </div>
               <button onClick={() => setIsAddTeacherOpen(false)} className="text-white hover:text-red-200 font-bold px-2 cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleCreateTeacher} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم الشيخ / المعلم كاملاً *</label>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">اسم المعلم / المعلمة كاملاً *</label>
                 <input
                   type="text"
                   required
-                  placeholder="مثال: الشيخ مصطفى عبد الرحيم"
+                  placeholder="أدخل الاسم الثلاثي أو الرباعي..."
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-[#E8DCCF] bg-[#FBF8F5] font-semibold text-xs focus:outline-none focus:border-[#4A2F18]"
                 />
+              </div>
+
+              {/* Gender Radio Selector */}
+              <div>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">النوع / اللقب المعيار *</label>
+                <div className="flex items-center gap-4 bg-[#FBF8F5] p-2.5 rounded-xl border border-[#E8DCCF]">
+                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="male"
+                      checked={newGender === 'male'}
+                      onChange={() => setNewGender('male')}
+                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
+                    />
+                    <span>ذكر (الشيخ / ...)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="female"
+                      checked={newGender === 'female'}
+                      onChange={() => setNewGender('female')}
+                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
+                    />
+                    <span>أنثى (المعلمة / ...)</span>
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -421,7 +458,7 @@ export const TeacherAttendanceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">ملاحظات ومؤهلات الشيخ</label>
+                <label className="block text-xs font-bold text-[#4A2F18] mb-1">ملاحظات ومؤهلات</label>
                 <textarea
                   rows={2}
                   placeholder="إجازات قرآنية، مؤهل أزهري، ملاحظات..."
