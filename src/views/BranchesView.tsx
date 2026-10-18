@@ -1673,7 +1673,7 @@ export const BranchesView: React.FC<BranchesViewProps> = ({ onNavigateToStats })
                       const branch = branches.find(b => b.id === t.branchId);
                       return (
                         <option key={t.id} value={t.id}>
-                          الشيخ / {t.fullName} ({branch?.name || 'الفرع الرئيسي'})
+                          {t.fullName} ({branch?.name || 'الفرع الرئيسي'})
                         </option>
                       );
                     })}
