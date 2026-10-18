@@ -30,19 +30,19 @@ interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) => {
   const { 
-    students, 
-    teachers, 
-    groups, 
-    studentAttendance, 
-    teacherAttendance, 
-    dues, 
-    sales, 
-    disciplineCases, 
-    rewards, 
-    rewardGrants, 
-    settings, 
+    students = [], 
+    teachers = [], 
+    groups = [], 
+    studentAttendance = [], 
+    teacherAttendance = [], 
+    dues = [], 
+    sales = [], 
+    disciplineCases = [], 
+    rewards = [], 
+    rewardGrants = [], 
+    settings = {} as any, 
     updateSettings,
-    branches, 
+    branches = [], 
     selectedBranchId, 
     checkStudentBan,
     getStudentAbsenceCountThisMonth 
@@ -71,18 +71,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
   const [summonsTearoffText, setSummonsTearoffText] = useState<string>(
     'أقر أنا ولي أمر الطالب المذكور أعلاه باستلامي خطاب الاستدعاء الرسمي الصادر من مدرسة السعيد القرآنية، وسأحضر للإدارة بمشيئة الله تعالى في الموعد المحدد.'
   );
-  
-  // Report template customization state
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [tmplAssociation, setTmplAssociation] = useState(settings.associationName);
-  const [tmplSchool, setTmplSchool] = useState(settings.schoolName);
-  const [tmplSubtitle, setTmplSubtitle] = useState(settings.reportSubtitle || '');
-  const [tmplShowLogo, setTmplShowLogo] = useState(settings.reportShowLogo !== false);
-  const [tmplSupervisor, setTmplSupervisor] = useState(settings.reportSupervisorTitle || 'مشرفة الغياب وشؤون الطلاب');
-  const [tmplFinance, setTmplFinance] = useState(settings.reportFinanceTitle || 'مشرف التحصيل والشؤون المالية');
-  const [tmplDirector, setTmplDirector] = useState(settings.reportDirectorTitle || 'مدير عام المدرسة واعتماد الجمعية');
-  const [tmplFooterNotes, setTmplFooterNotes] = useState(settings.reportFooterNotes || 'وثيقة رسمية صادرة من نظام مدرسة السعيد القرآنية — لا يعتد بأي تعديل يدوي غير مختوم.');
-  const [templateSavedNotice, setTemplateSavedNotice] = useState<string | null>(null);
 
   const handleReasonKindChange = (kind: string) => {
     setSummonsReasonKind(kind);
@@ -118,18 +106,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
     ? 'الإدارة المركزية (كافة الفروع)' 
     : (branches.find(b => b.id === selectedBranchId)?.name || 'الفرع المعتمد');
 
-  // Active student object for single student documents (e.g. Booklet, Monthly Card)
+  // Active student object
   const targetStudent = students.find(s => s.id === selectedStudentForDoc) || branchStudents[0] || students[0];
-  const targetGroup = groups.find(g => g.id === (targetStudent?.tahfeezGroupId || selectedGroupForRoll)) || groups[0];
-  const targetTeacher = teachers.find(t => t.id === targetGroup?.teacherId);
 
-  // Group for paper roll sheet
+  // Group safely fallback for paper roll sheet
   const activeRollGroup = groups.find(g => g.id === selectedGroupForRoll) || groups[0];
   const activeRollTeacher = teachers.find(t => t.id === activeRollGroup?.teacherId);
-  const activeRollStudents = students.filter(s => s.tahfeezGroupId === activeRollGroup?.id || s.tarbawiGroupId === activeRollGroup?.id);
+  const activeRollStudents = activeRollGroup 
+    ? students.filter(s => s.tahfeezGroupId === activeRollGroup.id || s.tarbawiGroupId === activeRollGroup.id)
+    : [];
 
-  // Banned students today for the gatekeeper report
-  const bannedStudents = branchStudents.filter(s => checkStudentBan(s.id).isBanned);
+  // Banned students today
+  const bannedStudents = branchStudents.filter(s => checkStudentBan && checkStudentBan(s.id).isBanned);
 
   // Trigger print
   const handlePrint = () => {
@@ -138,6 +126,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
 
   return (
     <div className="space-y-6">
+
+      {/* 🖨️ التنسيق الخاص بالطباعة لإجبار المتصفح على طباعة التقرير فقط */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          .printable-report-area, .printable-report-area * {
+            visibility: visible !important;
+          }
+          .printable-report-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
       
       {/* Top Banner (hidden in print) */}
       <div className="no-print bg-[#FFFFFF] p-5 rounded-2xl border border-[#E8DCCF] shadow-2xs space-y-4">
@@ -158,7 +171,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                   ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs' 
                   : 'bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18]'
               }`}
-              title="تفعيل إمكانية النقر وتعديل أي نص مباشرة في المستند قبل الطباعة"
             >
               <PenTool className="w-3.5 h-3.5" />
               <span>{isEditable ? 'التعديل المباشر: مُفعل (انقر لتعديل أي نص)' : 'تفعيل التعديل المباشر'}</span>
@@ -174,10 +186,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         </div>
 
-        {/* Sub-categories Selector: Offline Field Documents vs Management Reports */}
+        {/* Categories Selector */}
         <div className="space-y-3">
-          
-          {/* Category 1: Offline Field Documents */}
           <div>
             <span className="text-[11px] font-extrabold text-[#4A2F18] block mb-2 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-[#B9895B]" />
@@ -209,7 +219,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
             </div>
           </div>
 
-          {/* Category 2: Management & Administrative Reports */}
           <div className="pt-2 border-t border-[#E8DCCF]">
             <span className="text-[11px] font-bold text-[#8C6D53] block mb-2 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" />
@@ -261,13 +270,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                   </option>
                 ))}
               </select>
-              <span className="text-[11px] text-[#8C6D53]">
-                سيتم توليد الخطاب مطبوعاً باسم الطالب ورقم قيده وبيانات حلقته فوراً
-              </span>
             </div>
           )}
 
-          {/* Dedicated Guardian Summons Customization Controls */}
+          {/* Guardian Summons Controls */}
           {activeReportType === 'guardian_summons' && (
             <div className="p-4 bg-[#FBF8F5] rounded-xl border border-[#B9895B]/40 space-y-3">
               <div className="flex items-center justify-between border-b border-[#E8DCCF] pb-2">
@@ -329,7 +335,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">نص الخطاب الموجه لولي الأمر (قابل للتعديل الكامل):</label>
+                <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">نص الخطاب الموجه لولي الأمر:</label>
                 <textarea
                   rows={2}
                   value={summonsBody}
@@ -337,30 +343,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                   className="w-full p-2 text-xs rounded-lg border border-[#E8DCCF] bg-white text-[#2C1810] font-medium leading-relaxed"
                 />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">نص التنبيه الإداري:</label>
-                  <input
-                    type="text"
-                    value={summonsWarning}
-                    onChange={(e) => setSummonsWarning(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E8DCCF] bg-white text-[#2C1810]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">نص تعهد ولي الأمر في كعب الاستلام:</label>
-                  <input
-                    type="text"
-                    value={summonsTearoffText}
-                    onChange={(e) => setSummonsTearoffText(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E8DCCF] bg-white text-[#2C1810]"
-                  />
-                </div>
-              </div>
             </div>
           )}
 
+          {/* Selection for Paper Roll */}
           {activeReportType === 'paper_roll' && (
             <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] flex flex-wrap items-center gap-3 text-xs">
               <span className="font-bold text-[#4A2F18]">اختيار الحلقة لطباعة كشف التحضير الورقي:</span>
@@ -375,9 +361,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                   </option>
                 ))}
               </select>
-              <span className="text-[11px] text-[#8C6D53]">
-                كشف جاهز للتعليق بالقاعة للتحضير بالقلم الرصاص أو الجاف طوال أيام الشهر
-              </span>
             </div>
           )}
 
@@ -390,7 +373,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
       <div 
         contentEditable={isEditable} 
         suppressContentEditableWarning={true}
-        className={`printable-area bg-[#FFFFFF] p-8 sm:p-10 rounded-2xl border border-[#E8DCCF] shadow-sm print:shadow-none print:border-none print:p-0 text-black transition-all ${
+        className={`printable-report-area bg-[#FFFFFF] p-8 sm:p-10 rounded-2xl border border-[#E8DCCF] shadow-sm text-black transition-all ${
           isEditable ? 'ring-2 ring-amber-400/40' : ''
         }`}
       >
@@ -400,9 +383,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
               <PenTool className="w-4 h-4 text-amber-700" />
               <span>وضع التحرير المباشر نَشط: انقر مباشرة فوق أي عنوان، نص، أو خلية جدول لتعديلها بحرية تامة قبل الطباعة.</span>
             </span>
-            <span className="text-[11px] bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded-md font-mono">
-              تعديلاتك تُطبع مباشرة
-            </span>
           </div>
         )}
         
@@ -410,14 +390,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
         <div className="border-b-2 border-black pb-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-base font-extrabold text-black">{settings.associationName}</h1>
-              <h2 className="text-sm font-black text-black mt-0.5">{settings.schoolName}</h2>
+              <h1 className="text-base font-extrabold text-black">{settings?.associationName || 'الجمعية الخيرية'}</h1>
+              <h2 className="text-sm font-black text-black mt-0.5">{settings?.schoolName || 'مدرسة السعيد القرآنية'}</h2>
               <h3 className="text-xs font-bold text-gray-700 mt-0.5">{currentBranchName}</h3>
             </div>
             
-            {settings.reportShowLogo !== false && (
+            {settings?.reportShowLogo !== false && (
               <img 
-                src={settings.logoUrl || '/school_logo.jpg'} 
+                src={settings?.logoUrl || '/school_logo.jpg'} 
                 alt="شعار المدرسة" 
                 className="w-16 h-16 rounded-full object-cover border-2 border-black/40 shadow-xs"
                 referrerPolicy="no-referrer"
@@ -433,53 +413,59 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
           </div>
         </div>
 
-        {/* DOCUMENT 3: CLASSROOM PAPER ATTENDANCE ROLL SHEET */}
+        {/* DOCUMENT 3: CLASSROOM PAPER ATTENDANCE ROLL SHEET (مع حماية آمنة للبيانات) */}
         {activeReportType === 'paper_roll' && (
           <div className="space-y-4">
             <div className="text-center border-b-2 border-black pb-2">
               <h2 className="text-base font-black text-black">دفتر كشف حضور وغياب الحلقة الورقي (للتعليق بالحلقة)</h2>
               <p className="text-xs text-gray-800 mt-0.5">
-                الحلقة: <strong>{activeRollGroup.name}</strong> • المحفظ: <strong>{activeRollTeacher?.fullName || 'الشيخ'}</strong> • الفرع: <strong>{branches.find(b => b.id === activeRollGroup.branchId)?.name}</strong>
+                الحلقة: <strong>{activeRollGroup?.name || 'غير المحددة'}</strong> • المحفظ: <strong>{activeRollTeacher?.fullName || 'الشيخ'}</strong> • الفرع: <strong>{branches.find(b => b.id === activeRollGroup?.branchId)?.name || 'الفرع الرئيسي'}</strong>
               </p>
             </div>
 
             <div className="flex items-center justify-between text-[11px] font-bold text-gray-800">
-              <span>مواعيد الحلقة: {activeRollGroup.days.join('، ')} ({activeRollGroup.startTime} – {activeRollGroup.endTime})</span>
+              <span>مواعيد الحلقة: {activeRollGroup?.days ? activeRollGroup.days.join('، ') : 'السبت، الاثنين، الأربعاء'} ({activeRollGroup?.startTime || '15:30'} – {activeRollGroup?.endTime || '17:30'})</span>
               <span>شهر: أكتوبر 2026 م • عدد الطلاب: {activeRollStudents.length}</span>
             </div>
 
-            <table className="w-full text-right border-collapse text-[10px] border border-black">
-              <thead>
-                <tr className="bg-gray-100 font-bold border-b border-black text-center">
-                  <th className="py-2 px-1 border-l border-black w-8">م</th>
-                  <th className="py-2 px-2 border-l border-black w-44 text-right">اسم الطالب رباعي</th>
-                  <th className="py-2 px-1 border-l border-black w-16">الصف</th>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <th key={i} className="py-1 px-0.5 border-l border-black text-center w-6 tabular-nums">
-                      {i + 1}
-                    </th>
-                  ))}
-                  <th className="py-2 px-1 border-l border-black w-16">إجمالي الحضور</th>
-                  <th className="py-2 px-1 border-l border-black w-16">إجمالي الغياب</th>
-                  <th className="py-2 px-2 w-32">ملاحظات المحفظ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black">
-                {activeRollStudents.map((s, idx) => (
-                  <tr key={s.id} className="h-8">
-                    <td className="py-1 px-1 border-l border-black text-center font-bold tabular-nums">{idx + 1}</td>
-                    <td className="py-1 px-2 border-l border-black font-bold text-black text-xs">{s.fullName}</td>
-                    <td className="py-1 px-1 border-l border-black text-center">{s.grade}</td>
+            {activeRollStudents.length === 0 ? (
+              <div className="p-8 text-center text-xs font-bold text-gray-600 border border-black rounded">
+                لا يوجد طلاب مقيدون في هذه الحلقة حالياً لطباعة الكشف.
+              </div>
+            ) : (
+              <table className="w-full text-right border-collapse text-[10px] border border-black">
+                <thead>
+                  <tr className="bg-gray-100 font-bold border-b border-black text-center">
+                    <th className="py-2 px-1 border-l border-black w-8">م</th>
+                    <th className="py-2 px-2 border-l border-black w-44 text-right">اسم الطالب رباعي</th>
+                    <th className="py-2 px-1 border-l border-black w-16">الصف</th>
                     {Array.from({ length: 12 }).map((_, i) => (
-                      <td key={i} className="py-1 px-0.5 border-l border-black text-center"></td>
+                      <th key={i} className="py-1 px-0.5 border-l border-black text-center w-6 tabular-nums">
+                        {i + 1}
+                      </th>
                     ))}
-                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
-                    <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
-                    <td className="py-1 px-2 text-[9px] text-gray-400">...................</td>
+                    <th className="py-2 px-1 border-l border-black w-16">إجمالي الحضور</th>
+                    <th className="py-2 px-1 border-l border-black w-16">إجمالي الغياب</th>
+                    <th className="py-2 px-2 w-32">ملاحظات المحفظ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-black">
+                  {activeRollStudents.map((s, idx) => (
+                    <tr key={s.id} className="h-8">
+                      <td className="py-1 px-1 border-l border-black text-center font-bold tabular-nums">{idx + 1}</td>
+                      <td className="py-1 px-2 border-l border-black font-bold text-black text-xs">{s.fullName}</td>
+                      <td className="py-1 px-1 border-l border-black text-center">{s.grade}</td>
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <td key={i} className="py-1 px-0.5 border-l border-black text-center"></td>
+                      ))}
+                      <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
+                      <td className="py-1 px-1 border-l border-black text-center text-[10px]">......</td>
+                      <td className="py-1 px-2 text-[9px] text-gray-400">...................</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             <div className="flex items-center justify-between text-[10px] text-gray-700 pt-2 border-t border-black">
               <span>الرموز المعتمدة: [ ✔ حاضر ] [ ✘ غائب ] [ ع غائب بعذر ]</span>
@@ -492,76 +478,36 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
         {activeReportType === 'guardian_summons' && targetStudent && (
           <div className="space-y-6">
             <div className="text-center border-b-2 border-black pb-2">
-              <h2 
-                contentEditable={isEditable} 
-                suppressContentEditableWarning={true}
-                className={`text-base font-black text-black outline-hidden ${isEditable ? 'hover:bg-amber-50/60 rounded px-1' : ''}`}
-              >
-                {summonsTitle}
-              </h2>
-              <p 
-                contentEditable={isEditable} 
-                suppressContentEditableWarning={true}
-                className={`text-xs text-gray-800 mt-0.5 outline-hidden ${isEditable ? 'hover:bg-amber-50/60 rounded px-1' : ''}`}
-              >
-                {summonsSubtitle}
-              </p>
+              <h2 className="text-base font-black text-black">{summonsTitle}</h2>
+              <p className="text-xs text-gray-800 mt-0.5">{summonsSubtitle}</p>
             </div>
 
             <div className="p-4 border border-black rounded-lg space-y-3 text-xs leading-relaxed">
               <div className="flex justify-between font-bold border-b border-gray-300 pb-2">
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  إلى ولي أمر الطالب: <strong>{targetStudent.fullName}</strong>
-                </span>
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  الصف: <strong>{targetStudent.grade}</strong> • الفرع: <strong>{currentBranchName}</strong>
-                </span>
+                <span>إلى ولي أمر الطالب: <strong>{targetStudent.fullName}</strong></span>
+                <span>الصف: <strong>{targetStudent.grade}</strong> • الفرع: <strong>{currentBranchName}</strong></span>
               </div>
 
-              <div 
-                contentEditable={isEditable} 
-                suppressContentEditableWarning={true}
-                className={`outline-hidden whitespace-pre-line leading-relaxed text-xs text-[#2C1810] ${isEditable ? 'hover:bg-amber-50/60 rounded p-1 border border-dashed border-amber-300' : ''}`}
-              >
+              <div className="whitespace-pre-line leading-relaxed text-xs text-[#2C1810]">
                 {summonsBody}
               </div>
 
-              <div 
-                contentEditable={isEditable} 
-                suppressContentEditableWarning={true}
-                className={`p-2.5 bg-red-50 border border-red-300 rounded text-[11px] text-red-900 font-bold outline-hidden ${isEditable ? 'hover:bg-red-100/60' : ''}`}
-              >
+              <div className="p-2.5 bg-red-50 border border-red-300 rounded text-[11px] text-red-900 font-bold">
                 {summonsWarning}
               </div>
             </div>
 
-            {/* Tear-off Bottom Slip */}
             <div className="pt-6 border-t-2 border-dashed border-black space-y-3 text-xs">
               <div className="flex justify-between font-bold">
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  كعب استلام إخطار الاستدعاء (يقطعه ولي الأمر ويوقعه ويعيده مع الطالب):
-                </span>
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  التاريخ: ..... / ..... / 2026 م
-                </span>
+                <span>كعب استلام إخطار الاستدعاء (يقطعه ولي الأمر ويوقعه ويعيده مع الطالب):</span>
+                <span>التاريخ: ..... / ..... / 2026 م</span>
               </div>
-              <p 
-                contentEditable={isEditable} 
-                suppressContentEditableWarning={true}
-                className={`text-[11px] text-gray-800 outline-hidden ${isEditable ? 'hover:bg-amber-50/60 rounded p-1' : ''}`}
-              >
-                {summonsTearoffText}
-              </p>
+              <p className="text-[11px] text-gray-800">{summonsTearoffText}</p>
               <div className="flex justify-between items-end pt-3 font-bold">
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  رقم هاتف ولي الأمر: {targetStudent.guardianPhone || '.......................................'}
-                </span>
-                <span contentEditable={isEditable} suppressContentEditableWarning={true} className="outline-hidden">
-                  توقيع ولي الأمر: .......................................
-                </span>
+                <span>رقم هاتف ولي الأمر: {targetStudent.guardianPhone || '.......................................'}</span>
+                <span>توقيع ولي الأمر: .......................................</span>
               </div>
             </div>
-
           </div>
         )}
 
@@ -602,7 +548,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                   </tr>
                 ) : (
                   bannedStudents.map((student, idx) => {
-                    const ban = checkStudentBan(student.id);
+                    const ban = checkStudentBan ? checkStudentBan(student.id) : { details: '' };
                     return (
                       <tr key={student.id} className="hover:bg-red-50/40">
                         <td className="py-2.5 px-3 border-l border-black text-center font-bold tabular-nums">{idx + 1}</td>
@@ -647,7 +593,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
                     <td className="py-2 px-3 border-l border-black">{groups.find(g => g.id === s.tahfeezGroupId)?.name || '—'}</td>
                     <td className="py-2 px-3 border-l border-black">{groups.find(g => g.id === s.tarbawiGroupId)?.name || '—'}</td>
                     <td className="py-2 px-3 tabular-nums font-bold">
-                      {s.status === 'active' ? `منتظم (${getStudentAbsenceCountThisMonth(s.id)} غياب)` : s.status === 'dropped' ? `منقطع (${s.droppedReason || ''})` : s.status}
+                      {s.status === 'active' ? `منتظم (${getStudentAbsenceCountThisMonth ? getStudentAbsenceCountThisMonth(s.id) : 0} غياب)` : s.status === 'dropped' ? `منقطع (${s.droppedReason || ''})` : s.status}
                     </td>
                   </tr>
                 ))}
@@ -788,24 +734,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
         {/* Official Document Footer Signatures */}
         <div className="mt-10 pt-6 border-t-2 border-black grid grid-cols-3 gap-4 text-center text-xs font-bold text-black">
           <div>
-            <span>{settings.reportSupervisorTitle || 'مشرفة الغياب وشؤون الطلاب'}</span>
+            <span>{settings?.reportSupervisorTitle || 'مشرفة الغياب وشؤون الطلاب'}</span>
             <div className="h-10 border-b border-dotted border-black w-32 mx-auto mt-2" />
           </div>
 
           <div className="flex flex-col items-center justify-center">
             <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[9px] text-red-700 font-bold p-1 text-center rotate-[-6deg]">
-              {settings.reportStampText || 'خاتم المدرسة المعتمد'}
+              {settings?.reportStampText || 'خاتم المدرسة المعتمد'}
             </div>
           </div>
 
           <div>
-            <span>{settings.reportDirectorTitle || 'مدير عام المدرسة واعتماد الجمعية'}</span>
+            <span>{settings?.reportDirectorTitle || 'مدير عام المدرسة واعتماد الجمعية'}</span>
             <div className="h-10 border-b border-dotted border-black w-32 mx-auto mt-2" />
           </div>
         </div>
 
         <div className="text-[9px] text-gray-600 text-center pt-4 mt-2 border-t border-gray-300">
-          {settings.reportFooterNotes || 'وثيقة رسمية صادرة من نظام مدرسة السعيد القرآنية — لا يعتد بأي تعديل يدوي غير مختوم.'}
+          {settings?.reportFooterNotes || 'وثيقة رسمية صادرة من نظام مدرسة السعيد القرآنية — لا يعتد بأي تعديل يدوي غير مختوم.'}
         </div>
 
       </div>
