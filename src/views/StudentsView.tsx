@@ -22,6 +22,22 @@ interface StudentsViewProps {
   onPrintAdmissionSlip: (student: Student) => void;
 }
 
+// دالة ذكية للتحقق مما إذا كان اسم الطالب يشير لإنثى تلقائياً (للسجلات القديمة)
+const isFemaleName = (name: string): boolean => {
+  if (!name) return false;
+  const firstName = name.trim().split(/\s+/)[0];
+  
+  const femaleKeywords = [
+    'أمل', 'حفصة', 'ملك', 'فاطمة', 'مريم', 'عائشة', 'خديجة', 'زينب', 'رقية', 'أم كلثوم',
+    'أسماء', 'هاجر', 'سارة', 'شيماء', 'إيمان', 'آية', 'آيات', 'شهد', 'جنى', 'ملاك',
+    'روان', 'ريناد', 'فريدة', 'منة', 'منة الله', 'نور', 'نورا', 'نورهان', 'بسملة', 'تسنيم',
+    'رحمة', 'حبيبة', 'سلمى', 'سمية', 'جويرية', 'منى', 'رضوى', 'مي', 'ندى', 'ياسمين',
+    'إسراء', 'دعاء', 'أبله', 'أبلة', 'فتاة', 'بنت'
+  ];
+
+  return femaleKeywords.some(k => firstName === k || name.includes('بنات'));
+};
+
 export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onPrintAdmissionSlip }) => {
   const { 
     students, 
@@ -82,9 +98,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   // Filter students based on branch and criteria
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
+      const actualGender = s.gender === 'female' || s.gender === 'أنثى' || isFemaleName(s.fullName) ? 'female' : 'male';
+
       if (selectedBranchId !== 'all' && s.branchId !== selectedBranchId) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
-      if (genderFilter !== 'all' && s.gender !== genderFilter) return false;
+      if (genderFilter !== 'all' && actualGender !== genderFilter) return false;
       if (stageFilter !== 'all' && s.stage !== stageFilter) return false;
       if (groupFilter !== 'all' && s.tahfeezGroupId !== groupFilter && s.tarbawiGroupId !== groupFilter) return false;
       if (bannedFilter === 'banned') {
@@ -146,10 +164,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   };
 
   const handleOpenEdit = (student: Student) => {
+    const determinedGender = (student.gender === 'female' || student.gender === 'أنثى' || isFemaleName(student.fullName)) ? 'female' : 'male';
     setEditingStudentId(student.id);
     setStudentBranchId(student.branchId);
     setFullName(student.fullName);
-    setGender(student.gender || 'male');
+    setGender(determinedGender);
     setStage(student.stage);
     setGrade(student.grade);
     setTahfeezGroupId(student.tahfeezGroupId || '');
@@ -231,17 +250,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   const handleExportCSV = () => {
     const headers = ['المعرف', 'الاسم رباعي', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
-    const rows = filteredStudents.map(s => [
-      s.id,
-      `"${s.fullName}"`,
-      s.gender === 'female' ? 'أنثى' : 'ذكر',
-      s.stage === 'primary' ? 'ابتدائي' : s.stage === 'prep' ? 'إعدادي' : 'ثانوي فما فوق',
-      `"${s.grade}"`,
-      s.guardianPhone,
-      s.isOrphan ? 'يتيم' : 'غير يتيم',
-      s.feeMode,
-      s.status
-    ]);
+    const rows = filteredStudents.map(s => {
+      const isFemale = s.gender === 'female' || s.gender === 'أنثى' || isFemaleName(s.fullName);
+      return [
+        s.id,
+        `"${s.fullName}"`,
+        isFemale ? 'أنثى' : 'ذكر',
+        s.stage === 'primary' ? 'ابتدائي' : s.stage === 'prep' ? 'إعدادي' : 'ثانوي فما فوق',
+        `"${s.grade}"`,
+        s.guardianPhone,
+        s.isOrphan ? 'يتيم' : 'غير يتيم',
+        s.feeMode,
+        s.status
+      ];
+    });
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -735,6 +757,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   const absenceCount = getStudentAbsenceCountThisMonth(student.id);
                   const tahfeezGrp = groups.find(g => g.id === student.tahfeezGroupId);
                   const tarbawiGrp = groups.find(g => g.id === student.tarbawiGroupId);
+                  
+                  // فحص أوتوماتيكي ومباشر للنوع
+                  const isFemale = student.gender === 'female' || student.gender === 'أنثى' || isFemaleName(student.fullName);
 
                   return (
                     <tr key={student.id} className={`hover:bg-[#FDFBF9] transition ${student.status === 'dropped' ? 'bg-amber-50/20' : ''}`}>
@@ -773,11 +798,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                       {/* Gender Column */}
                       <td className="py-3 px-3">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          (student.gender === 'female' || student.gender === 'أنثى')
+                          isFemale 
                             ? 'bg-rose-50 text-rose-700 border border-rose-200' 
                             : 'bg-blue-50 text-blue-700 border border-blue-200'
                         }`}>
-                          {(student.gender === 'female' || student.gender === 'أنثى') ? 'أنثى' : 'ذكر'}
+                          {isFemale ? 'أنثى' : 'ذكر'}
                         </span>
                       </td>
 
