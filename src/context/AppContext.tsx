@@ -190,7 +190,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     setEditingStudentId(student.id);
     setStudentBranchId(student.branchId);
     setFullName(student.fullName);
-    setGender(determinedGender); // تعيين القيمة الصحيحة للراديو بذكاء
+    setGender(determinedGender);
     setStage(student.stage);
     setGrade(student.grade);
     setTahfeezGroupId(student.tahfeezGroupId || '');
@@ -238,7 +238,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     const studentData = {
       branchId: studentBranchId,
       fullName: fullName.trim(),
-      gender: gender, // تُرسل صراحةً لـ Supabase
+      gender: gender,
       grade,
       stage,
       guardianPhone: finalPhone,
@@ -495,7 +495,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   onChange={(e) => {
                     const val = e.target.value;
                     setFullName(val);
-                    // تحديد النوع تلقائياً عند إضافة طالب جديد فقط أثناء كتابة الاسم
                     if (!editingStudentId && val.trim().length >= 2) {
                       setGender(detectStudentGender({ fullName: val }));
                     }
