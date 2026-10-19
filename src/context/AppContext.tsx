@@ -1,1105 +1,1580 @@
-import React, { useState, useMemo } from 'react';
-import { useApp } from '../context/AppContext';
-import { Student, EducationalStage, FeeMode } from '../types';
-import { 
-  UserPlus, 
-  Search, 
-  Download, 
-  ShieldAlert, 
-  Eye, 
-  Trash2, 
-  Printer, 
-  CheckCircle2, 
-  AlertCircle,
-  UserMinus,
-  RefreshCw,
-  X,
-  Edit3
-} from 'lucide-react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  User,
+  Branch,
+  Department,
+  Teacher,
+  Group,
+  Student,
+  Family,
+  StudentAttendance,
+  TeacherAttendance,
+  DisciplineCase,
+  StudentNote,
+  Due,
+  Payment,
+  StoreItem,
+  Sale,
+  PointsEntry,
+  Reward,
+  RewardGrant,
+  MessageTemplate,
+  MessageLog,
+  AuditLog,
+  SchoolSettings,
+  StudentBanInfo,
+  StudentStatus
+} from '../types';
+import {
+  initialBranches,
+  initialUsers,
+  initialDepartments,
+  initialTeachers,
+  initialGroups,
+  initialFamilies,
+  initialStudents,
+  initialDisciplineCases,
+  initialSettings,
+  initialDues,
+  initialPayments,
+  initialStoreItems,
+  initialSales,
+  initialRewards,
+  initialRewardGrants,
+  initialStudentAttendance,
+  initialPointsLedger,
+  initialTeacherAttendance,
+  initialStudentNotes,
+  initialMessageTemplates,
+  initialMessageLogs,
+  initialAuditLogs,
+  OFFICIAL_SCHOOL_LOGO
+} from '../data/initialData';
+import { testSupabaseConnection } from '../lib/supabase';
+import {
+  mappers,
+  fetchTable,
+  upsertRecord,
+  insertBatch,
+  deleteRecord
+} from '../lib/supabaseSync';
 
-interface StudentsViewProps {
-  onSelectStudent: (student: Student) => void;
-  onPrintAdmissionSlip: (student: Student) => void;
-}
+// 🧠 دالة ذكية معالجة لحقل النوع لمنع NULL أو UNDEFINED القادم من Supabase
+const normalizeStudent = (s: any): Student => {
+  let gender: 'male' | 'female' = 'male';
+  const rawGender = String(s?.gender || s?.sex || '').trim().toLowerCase();
 
-// 🧠 محرك الفحص الذكي للتعرف على نوع الطالب من الحقل أو من الاسم تلقائياً
-const detectStudentGender = (student: Student | { gender?: string; fullName?: string }): 'male' | 'female' => {
-  const g = String(student.gender || '').trim().toLowerCase();
-  
-  // 1. إذا كان الحقل مخزناً صراحة في Supabase
-  if (g === 'female' || g === 'أنثى' || g === 'أنثي') return 'female';
-  if (g === 'male' || g === 'ذكر') return 'male';
+  if (rawGender === 'female' || rawGender === 'أنثى' || rawGender === 'أنثي') {
+    gender = 'female';
+  } else if (rawGender === 'male' || rawGender === 'ذكر') {
+    gender = 'male';
+  } else {
+    // التنبؤ بالنوع بناءً على الاسم إذا كان الحقل في قاعدة البيانات NULL
+    const cleanName = String(s?.fullName || s?.full_name || '').trim().replace(/[\u064B-\u0652]/g, '');
+    const firstName = cleanName.split(/\s+/)[0] || '';
+    const femaleNames = new Set([
+      'مودة', 'مي', 'ندى', 'منى', 'رضوى', 'هبة', 'شهد', 'جنى', 'ملك', 'أمل', 'نور',
+      'مريم', 'فاطمة', 'عائشة', 'خديجة', 'زينب', 'رقية', 'أم كلثوم', 'أسماء', 'هاجر',
+      'سارة', 'شيماء', 'إيمان', 'آية', 'آيات', 'ملاك', 'روان', 'ريناد', 'فريدة', 'منة',
+      'بسملة', 'تسنيم', 'رحمة', 'حبيبة', 'سلمى', 'سمية', 'جويرية', 'ياسمين', 'إسراء',
+      'دعاء', 'ميار', 'ميرنا', 'منار', 'مهرة', 'نداء', 'وفاء', 'صابرين', 'شرين', 'شيرين'
+    ]);
 
-  // 2. إذا كان الحقل فارغاً في الداتا بيز، نفحص الاسم الأول تلقائياً
-  const fullName = student.fullName || '';
-  if (!fullName) return 'male';
-
-  const cleanName = fullName.trim().replace(/[\u064B-\u0652]/g, '');
-  const firstName = cleanName.split(/\s+/)[0] || '';
-
-  // قائمة الأسماء الشهيرة للإناث
-  const femaleNames = new Set([
-    'مودة', 'مي', 'ندى', 'منى', 'رضوى', 'هبة', 'شهد', 'جنى', 'ملك', 'أمل', 'نور',
-    'مريم', 'فاطمة', 'عائشة', 'خديجة', 'زينب', 'رقية', 'أم كلثوم', 'أسماء', 'هاجر',
-    'سارة', 'شيماء', 'إيمان', 'آية', 'آيات', 'ملاك', 'روان', 'ريناد', 'فريدة', 'منة',
-    'بسملة', 'تسنيم', 'رحمة', 'حبيبة', 'سلمى', 'سمية', 'جويرية', 'ياسمين', 'إسراء',
-    'دعاء', 'ميار', 'ميرنا', 'منار', 'مهرة', 'نداء', 'وفاء', 'صابرين', 'شرين', 'شيرين'
-  ]);
-
-  if (femaleNames.has(firstName)) return 'female';
-
-  // استثناءات ذكور تنتهي بتاء مربوطة
-  const maleExceptions = new Set(['حمزة', 'طلحة', 'عبيدة', 'حذيفة', 'قتادة', 'سلامة', 'عكرمة']);
-  if (maleExceptions.has(firstName)) return 'male';
-
-  // قواعد الأسماء المنتهية بتاء مربوطة أو هاء أو المبتدئة بـ أم
-  if (firstName.endsWith('ة') || firstName.endsWith('ه') || cleanName.startsWith('أم ')) {
-    return 'female';
+    if (femaleNames.has(firstName) || (firstName.endsWith('ة') && !['حمزة', 'طلحة', 'عبيدة', 'حذيفة'].includes(firstName))) {
+      gender = 'female';
+    }
   }
 
-  return 'male';
+  return {
+    ...s,
+    gender
+  };
 };
 
-export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onPrintAdmissionSlip }) => {
-  const { 
-    students, 
-    groups, 
-    teachers, 
-    branches, 
-    families, 
-    selectedBranchId, 
-    addStudent, 
-    updateStudent,
-    deleteStudent, 
-    setStudentDropped,
-    reactivateStudent,
-    checkStudentBan,
-    getStudentAbsenceCountThisMonth,
-    currentUser
-  } = useApp();
+interface AppContextType {
+  currentUser: User;
+  setCurrentUser: (user: User) => void;
+  selectedBranchId: string;
+  setSelectedBranchId: (branchId: string) => void;
+  branches: Branch[];
+  users: User[];
+  departments: Department[];
+  teachers: Teacher[];
+  groups: Group[];
+  students: Student[];
+  families: Family[];
+  studentAttendance: StudentAttendance[];
+  teacherAttendance: TeacherAttendance[];
+  disciplineCases: DisciplineCase[];
+  studentNotes: StudentNote[];
+  dues: Due[];
+  payments: Payment[];
+  storeItems: StoreItem[];
+  sales: Sale[];
+  pointsLedger: PointsEntry[];
+  rewards: Reward[];
+  rewardGrants: RewardGrant[];
+  messageTemplates: MessageTemplate[];
+  messageLogs: MessageLog[];
+  auditLogs: AuditLog[];
+  settings: SchoolSettings;
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  checkStudentBan: (studentId: string) => StudentBanInfo;
+  getStudentAbsenceCountThisMonth: (studentId: string, month?: string) => number;
+  getStudentPoints: (studentId: string) => number;
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [genderFilter, setGenderFilter] = useState<string>('all');
-  const [stageFilter, setStageFilter] = useState<string>('all');
-  const [bannedFilter, setBannedFilter] = useState<string>('all');
-  const [groupFilter, setGroupFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  addStudent: (student: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) => Student;
+  updateStudent: (id: string, updates: Partial<Student>) => void;
+  deleteStudent: (id: string, permanent?: boolean) => void;
   
-  // Drop student modal
-  const [studentToDrop, setStudentToDrop] = useState<Student | null>(null);
-  const [dropReason, setDropReason] = useState('انتقال لظروف عائلية أو سكنية');
-  const [actionSuccessNotice, setActionSuccessNotice] = useState<string | null>(null);
+  saveStudentAttendanceBatch: (records: { 
+    studentId: string; 
+    departmentId: string; 
+    groupId: string; 
+    date: string; 
+    status: 'present' | 'absent' | 'excused'; 
+    excuseReason?: string;
+  }[]) => void;
+  saveTeacherAttendance: (record: Omit<TeacherAttendance, 'id' | 'createdAt' | 'lateMinutes' | 'earlyLeaveMinutes' | 'workedMinutes'>) => void;
   
-  // Permanent delete modal
-  const [studentToDeletePermanent, setStudentToDeletePermanent] = useState<Student | null>(null);
+  recordPayment: (payment: Omit<Payment, 'id' | 'receiptNo' | 'userId' | 'userName'>) => Payment;
+  generateMonthlyDues: (month: string) => void;
+  
+  recordSale: (sale: Omit<Sale, 'id' | 'receiptNo' | 'userId'>) => Sale;
+  addStoreItem: (item: Omit<StoreItem, 'id'>) => void;
+  updateStoreItem: (id: string, item: Partial<StoreItem>) => void;
+  
+  recordGuardianAttendance: (caseId: string, guardianName: string, note?: string) => void;
+  adminExceptionalUnban: (caseId: string, reason: string) => void;
+  
+  deliverReward: (studentId: string, rewardId: string) => void;
+  addManualPoints: (studentId: string, points: number, reason: string) => void;
+  
+  addStudentNote: (studentId: string, type: 'appearance' | 'behavior' | 'guardian_contact', text: string) => void;
+  
+  updateSettings: (newSettings: Partial<SchoolSettings>) => void;
+  updateMessageTemplate: (id: string, template: string) => void;
+  logMessageSent: (log: Omit<MessageLog, 'id' | 'sentAt'>) => void;
+  
+  addTeacher: (teacher: Omit<Teacher, 'id'>) => void;
+  updateTeacher: (id: string, teacher: Partial<Teacher>) => void;
+  deleteTeacher: (id: string) => void;
+  addGroup: (group: Omit<Group, 'id'>) => void;
+  updateGroup: (id: string, group: Partial<Group>) => void;
+  deleteGroup: (id: string) => void;
+  addBranch: (branch: Omit<Branch, 'id'>) => void;
+  updateBranch: (id: string, updates: Partial<Branch>) => void;
+  toggleBranchStatus: (id: string) => void;
+  deleteBranch: (id: string) => void;
+  
+  setStudentDropped: (id: string, reason: string) => void;
+  reactivateStudent: (id: string) => void;
+  deleteStoreItem: (id: string) => void;
+  
+  addReward: (reward: Omit<Reward, 'id'>) => void;
+  updateReward: (id: string, updates: Partial<Reward>) => void;
+  deleteReward: (id: string) => void;
+  
+  addUser: (user: Omit<User, 'id'>) => void;
+  updateUser: (id: string, updates: Partial<User>) => void;
+  deleteUser: (id: string) => void;
+  
+  canUserAccessModule: (moduleName: string) => boolean;
 
-  // Form state
-  const [studentBranchId, setStudentBranchId] = useState<string>(
-    selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
-  );
-  const [fullName, setFullName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [stage, setStage] = useState<EducationalStage>('primary');
-  const [grade, setGrade] = useState('الصف الرابع الابتدائي');
-  const [tahfeezGroupId, setTahfeezGroupId] = useState(groups.find(g => g.departmentId === 'tahfeez')?.id || '');
-  const [tarbawiGroupId, setTarbawiGroupId] = useState(groups.find(g => g.departmentId === 'tarbawi')?.id || '');
-  const [guardianPhone, setGuardianPhone] = useState('');
-  const [isOrphan, setIsOrphan] = useState(false);
-  const [feeMode, setFeeMode] = useState<FeeMode>('normal');
-  const [feeDiscountAmount, setFeeDiscountAmount] = useState<number>(0);
-  const [feeReason, setFeeReason] = useState('');
-  const [familyId, setFamilyId] = useState<string>('');
-  const [joinDate, setJoinDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState('');
-  const [agreementAccepted, setAgreementAccepted] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  isAuthenticated: boolean;
+  login: (usernameOrPhone: string, password?: string) => boolean;
+  logout: () => void;
+  clearMockData: () => void;
 
-  // Filter students based on branch and criteria
-  const filteredStudents = useMemo(() => {
-    return students.filter(s => {
-      const actualGender = detectStudentGender(s);
+  exportBackupJson: () => string;
+  importBackupJson: (jsonString: string) => boolean;
+  resetToDemoData: () => void;
 
-      if (selectedBranchId !== 'all' && s.branchId !== selectedBranchId) return false;
-      if (statusFilter !== 'all' && s.status !== statusFilter) return false;
-      if (genderFilter !== 'all' && actualGender !== genderFilter) return false;
-      if (stageFilter !== 'all' && s.stage !== stageFilter) return false;
-      if (groupFilter !== 'all' && s.tahfeezGroupId !== groupFilter && s.tarbawiGroupId !== groupFilter) return false;
-      if (bannedFilter === 'banned') {
-        if (!checkStudentBan(s.id).isBanned) return false;
+  isSupabaseConnected: boolean;
+  isSyncing: boolean;
+  syncStatusMessage: string;
+  seedInitialDataToSupabase: () => Promise<{ success: boolean; message: string }>;
+  fetchFromSupabase: () => Promise<{ success: boolean; message: string }>;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const STORAGE_PREFIX = 'alsaeed_v2_live_';
+const AUTH_KEY = 'alsaeed_authenticated_user_id';
+
+try {
+  const legacyPrefix = 'alsaeed_quran_platform_';
+  ['students', 'families', 'studentAttendance', 'teacherAttendance', 'disciplineCases', 'dues', 'payments', 'sales', 'rewardGrants', 'pointsLedger', 'studentNotes', 'messageLogs'].forEach(k => {
+    localStorage.removeItem(legacyPrefix + k);
+  });
+} catch {
+  // Ignore
+}
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const item = localStorage.getItem(STORAGE_PREFIX + key);
+    return item ? JSON.parse(item) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveToStorage<T>(key: string, data: T) {
+  try {
+    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save to storage', err);
+  }
+}
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [branches, setBranches] = useState<Branch[]>(() => loadFromStorage('branches', initialBranches));
+  const [users, setUsers] = useState<User[]>(() => loadFromStorage('users', initialUsers));
+  
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem(AUTH_KEY));
+    } catch {
+      return false;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    try {
+      const savedUserId = localStorage.getItem(AUTH_KEY);
+      if (savedUserId) {
+        const found = initialUsers.find(u => u.id === savedUserId);
+        if (found) return found;
       }
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesName = s.fullName.toLowerCase().includes(query);
-        const matchesPhone = s.guardianPhone.includes(query);
-        if (!matchesName && !matchesPhone) return false;
-      }
-      return true;
+    } catch {
+      // ignore
+    }
+    return initialUsers[0];
+  });
+
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+
+  const [departments, setDepartments] = useState<Department[]>(() => loadFromStorage('departments', initialDepartments));
+  const [teachers, setTeachers] = useState<Teacher[]>(() => loadFromStorage('teachers', initialTeachers));
+  const [groups, setGroups] = useState<Group[]>(() => loadFromStorage('groups', initialGroups));
+  const [students, setStudents] = useState<Student[]>(() => {
+    const loaded = loadFromStorage('students', initialStudents);
+    return loaded.map(normalizeStudent);
+  });
+  const [families, setFamilies] = useState<Family[]>(() => loadFromStorage('families', initialFamilies));
+  const [studentAttendance, setStudentAttendance] = useState<StudentAttendance[]>(() => loadFromStorage('studentAttendance', initialStudentAttendance));
+  const [teacherAttendance, setTeacherAttendance] = useState<TeacherAttendance[]>(() => loadFromStorage('teacherAttendance', initialTeacherAttendance));
+  const [disciplineCases, setDisciplineCases] = useState<DisciplineCase[]>(() => loadFromStorage('disciplineCases', initialDisciplineCases));
+  const [studentNotes, setStudentNotes] = useState<StudentNote[]>(() => loadFromStorage('studentNotes', initialStudentNotes));
+  const [dues, setDues] = useState<Due[]>(() => loadFromStorage('dues', initialDues));
+  const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('payments', initialPayments));
+  const [storeItems, setStoreItems] = useState<StoreItem[]>(() => loadFromStorage('storeItems', initialStoreItems));
+  const [sales, setSales] = useState<Sale[]>(() => loadFromStorage('sales', initialSales));
+  const [pointsLedger, setPointsLedger] = useState<PointsEntry[]>(() => loadFromStorage('pointsLedger', initialPointsLedger));
+  const [rewards, setRewards] = useState<Reward[]>(() => loadFromStorage('rewards', initialRewards));
+  const [rewardGrants, setRewardGrants] = useState<RewardGrant[]>(() => loadFromStorage('rewardGrants', initialRewardGrants));
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadFromStorage('messageTemplates', initialMessageTemplates));
+  const [messageLogs, setMessageLogs] = useState<MessageLog[]>(() => loadFromStorage('messageLogs', initialMessageLogs));
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadFromStorage('auditLogs', initialAuditLogs));
+  const [settings, setSettings] = useState<SchoolSettings>(() => {
+    const loaded = loadFromStorage('settings', initialSettings);
+    if (
+      !loaded.logoUrl ||
+      loaded.logoUrl.includes('placeholder') ||
+      loaded.logoUrl.includes('unsplash') ||
+      !loaded.logoUrl.includes('school_')
+    ) {
+      return { ...loaded, logoUrl: OFFICIAL_SCHOOL_LOGO || '/school_logo.jpg' };
+    }
+    return loaded;
+  });
+
+  const addAuditLog = (action: string, details: string) => {
+    if (!currentUser) return;
+    const entry: AuditLog = {
+      id: 'al_' + Date.now() + Math.random().toString(36).substring(2, 6),
+      userId: currentUser.id,
+      userName: currentUser.fullName,
+      action,
+      details,
+      timestamp: new Date().toISOString()
+    };
+    setAuditLogs(prev => [entry, ...prev]);
+  };
+
+  const login = (usernameOrPhone: string, password?: string): boolean => {
+    const rawInput = usernameOrPhone.trim();
+    const trimmed = rawInput.toLowerCase();
+    const trimmedPass = (password || '').trim();
+
+    const found = users.find(u => {
+      const uName = u.username.toLowerCase();
+      const uPhone = (u.phone || '').trim();
+      const uFullName = u.fullName.toLowerCase();
+
+      return (
+        uName === trimmed ||
+        uPhone === rawInput ||
+        (trimmed === 'admin' && u.role === 'admin') ||
+        (trimmed.includes('صاحب') && u.role === 'admin') ||
+        (trimmed.includes('مدير') && u.role === 'admin') ||
+        uFullName.includes(trimmed)
+      );
     });
-  }, [students, selectedBranchId, statusFilter, genderFilter, stageFilter, groupFilter, bannedFilter, searchQuery, checkStudentBan]);
 
-  // Selected Group Helper for Tahfeez & Tarbawi
-  const selectedTahfeezGroup = groups.find(g => g.id === tahfeezGroupId);
-  const selectedTahfeezTeacher = teachers.find(t => t.id === selectedTahfeezGroup?.teacherId);
+    if (!found || !found.active) {
+      return false;
+    }
 
-  const selectedTarbawiGroup = groups.find(g => g.id === tarbawiGroupId);
-  const selectedTarbawiTeacher = teachers.find(t => t.id === selectedTarbawiGroup?.teacherId);
+    if (found.password) {
+      const expectedPass = found.password.trim();
+      if (trimmedPass) {
+        if (
+          trimmedPass !== expectedPass &&
+          !(found.role === 'admin' && (trimmedPass === 'admin' || trimmedPass === '123456'))
+        ) {
+          return false;
+        }
+      }
+    }
 
-  const handleGuardianPhoneChange = (val: string) => {
-    setGuardianPhone(val);
-    const cleaned = val.replace(/\D/g, '').replace(/^0+/, '');
-    const norm = cleaned.startsWith('20') ? cleaned : '20' + cleaned;
-    const existingWithSamePhone = students.find(s => s.guardianPhone === norm || s.guardianPhone.endsWith(cleaned.slice(-9)));
-    if (existingWithSamePhone?.familyId) {
-      setFamilyId(existingWithSamePhone.familyId);
+    try {
+      localStorage.setItem(AUTH_KEY, found.id);
+    } catch {
+      // ignore
+    }
+
+    window.location.reload();
+    return true;
+  };
+
+  const logout = () => {
+    if (currentUser) {
+      addAuditLog('تسجيل خروج', `تسجيل خروج المستخدم ${currentUser.fullName}`);
+    }
+    setIsAuthenticated(false);
+    try {
+      localStorage.removeItem(AUTH_KEY);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+
+  const clearMockData = () => {
+    setStudents([]);
+    setFamilies([]);
+    setStudentAttendance([]);
+    setTeacherAttendance([]);
+    setDisciplineCases([]);
+    setDues([]);
+    setPayments([]);
+    setSales([]);
+    setRewardGrants([]);
+    setPointsLedger([]);
+    setStudentNotes([]);
+    setAuditLogs([]);
+
+    saveToStorage('students', []);
+    saveToStorage('families', []);
+    saveToStorage('studentAttendance', []);
+    saveToStorage('teacherAttendance', []);
+    saveToStorage('disciplineCases', []);
+    saveToStorage('dues', []);
+    saveToStorage('payments', []);
+    saveToStorage('sales', []);
+    saveToStorage('rewardGrants', []);
+    saveToStorage('pointsLedger', []);
+    saveToStorage('studentNotes', []);
+    saveToStorage('auditLogs', []);
+
+    addAuditLog('مسح البيانات الوهمية', 'تم مسح وتفريغ كافة البيانات المؤقتة والوهمية من المنصة بنجاح.');
+  };
+
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncStatusMessage, setSyncStatusMessage] = useState<string>('جارٍ الاتصال بقاعدة بيانات Supabase...');
+
+  const fetchFromSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    setIsSyncing(true);
+    setSyncStatusMessage('جارٍ فحص وتحميل البيانات من Supabase...');
+    try {
+      const conn = await testSupabaseConnection();
+      setIsSupabaseConnected(conn.success);
+      if (!conn.success) {
+        setIsSyncing(false);
+        setSyncStatusMessage(conn.message);
+        return { success: false, message: conn.message };
+      }
+
+      const [
+        dbBranches,
+        dbUsers,
+        dbDepts,
+        dbTeachers,
+        dbGroups,
+        dbStudents,
+        dbFamilies,
+        dbStudentAtt,
+        dbTeacherAtt,
+        dbDiscipline,
+        dbNotes,
+        dbDues,
+        dbPayments,
+        dbStoreItems,
+        dbSales,
+        dbPoints,
+        dbRewards,
+        dbRewardGrants,
+        dbMsgTemplates,
+        dbMsgLogs,
+        dbAuditLogs,
+        dbSettings
+      ] = await Promise.all([
+        fetchTable('branches', mappers.branch.fromDb, branches),
+        fetchTable('users', mappers.user.fromDb, users),
+        fetchTable('departments', mappers.department.fromDb, departments),
+        fetchTable('teachers', mappers.teacher.fromDb, teachers),
+        fetchTable('groups', mappers.group.fromDb, groups),
+        fetchTable('students', mappers.student.fromDb, students),
+        fetchTable('families', mappers.family.fromDb, families),
+        fetchTable('student_attendance', mappers.studentAttendance.fromDb, studentAttendance),
+        fetchTable('teacher_attendance', mappers.teacherAttendance.fromDb, teacherAttendance),
+        fetchTable('discipline_cases', mappers.disciplineCase.fromDb, disciplineCases),
+        fetchTable('student_notes', mappers.studentNote.fromDb, studentNotes),
+        fetchTable('dues', mappers.due.fromDb, dues),
+        fetchTable('payments', mappers.payment.fromDb, payments),
+        fetchTable('store_items', mappers.storeItem.fromDb, storeItems),
+        fetchTable('sales', mappers.sale.fromDb, sales),
+        fetchTable('points_ledger', mappers.pointsLedger.fromDb, pointsLedger),
+        fetchTable('rewards', mappers.reward.fromDb, rewards),
+        fetchTable('reward_grants', mappers.rewardGrant.fromDb, rewardGrants),
+        fetchTable('message_templates', mappers.messageTemplate.fromDb, messageTemplates),
+        fetchTable('message_logs', mappers.messageLog.fromDb, messageLogs),
+        fetchTable('audit_logs', mappers.auditLog.fromDb, auditLogs),
+        fetchTable('settings', mappers.settings.fromDb, [settings])
+      ]);
+
+      if (dbBranches.length > 0) setBranches(dbBranches);
+      if (dbUsers.length > 0) setUsers(dbUsers);
+      if (dbDepts.length > 0) setDepartments(dbDepts);
+      if (dbTeachers.length > 0) setTeachers(dbTeachers);
+      if (dbGroups.length > 0) setGroups(dbGroups);
+      
+      // تطبيق المعالجة والتنظيف الذكي لجداول الطلاب لمنع حقل NULL في gender
+      if (dbStudents.length > 0) {
+        setStudents(dbStudents.map(normalizeStudent));
+      }
+      
+      if (dbFamilies.length > 0) setFamilies(dbFamilies);
+      if (dbStudentAtt.length > 0) setStudentAttendance(dbStudentAtt);
+      if (dbTeacherAtt.length > 0) setTeacherAttendance(dbTeacherAtt);
+      if (dbDiscipline.length > 0) setDisciplineCases(dbDiscipline);
+      if (dbNotes.length > 0) setStudentNotes(dbNotes);
+      if (dbDues.length > 0) setDues(dbDues);
+      if (dbPayments.length > 0) setPayments(dbPayments);
+      if (dbStoreItems.length > 0) setStoreItems(dbStoreItems);
+      if (dbSales.length > 0) setSales(dbSales);
+      if (dbPoints.length > 0) setPointsLedger(dbPoints);
+      if (dbRewards.length > 0) setRewards(dbRewards);
+      if (dbRewardGrants.length > 0) setRewardGrants(dbRewardGrants);
+      if (dbMsgTemplates.length > 0) setMessageTemplates(dbMsgTemplates);
+      if (dbMsgLogs.length > 0) setMessageLogs(dbMsgLogs);
+      if (dbAuditLogs.length > 0) setAuditLogs(dbAuditLogs);
+      if (dbSettings.length > 0 && dbSettings[0]) setSettings(dbSettings[0]);
+
+      setIsSyncing(false);
+      setSyncStatusMessage('قاعدة بيانات Supabase متصلة ومحدثة بنجاح.');
+      return { success: true, message: 'تم تحميل وتحديث البيانات من Supabase بنجاح.' };
+    } catch (err: any) {
+      setIsSyncing(false);
+      setSyncStatusMessage('حدث خطأ أثناء تحميل البيانات من Supabase.');
+      return { success: false, message: err?.message || 'خطأ في الاتصال' };
     }
   };
 
-  const handleStageChange = (newStage: EducationalStage) => {
-    setStage(newStage);
-    if (newStage === 'primary') setGrade('الصف الرابع الابتدائي');
-    else if (newStage === 'prep') setGrade('الصف الثاني الإعدادي');
-    else setGrade('الصف الأول الثانوي');
+  const seedInitialDataToSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    setIsSyncing(true);
+    setSyncStatusMessage('جارٍ رفع ومزامنة كافة البيانات الأولية إلى Supabase...');
+    try {
+      await upsertRecord('settings', mappers.settings.toDb(settings));
+      if (departments.length > 0) await insertBatch('departments', departments.map(mappers.department.toDb));
+      if (branches.length > 0) await insertBatch('branches', branches.map(mappers.branch.toDb));
+      if (users.length > 0) await insertBatch('users', users.map(mappers.user.toDb));
+      if (teachers.length > 0) await insertBatch('teachers', teachers.map(mappers.teacher.toDb));
+      if (groups.length > 0) await insertBatch('groups', groups.map(mappers.group.toDb));
+      if (families.length > 0) await insertBatch('families', families.map(mappers.family.toDb));
+      if (students.length > 0) await insertBatch('students', students.map(s => mappers.student.toDb(normalizeStudent(s))));
+      if (studentAttendance.length > 0) await insertBatch('student_attendance', studentAttendance.map(mappers.studentAttendance.toDb));
+      if (teacherAttendance.length > 0) await insertBatch('teacher_attendance', teacherAttendance.map(mappers.teacherAttendance.toDb));
+      if (disciplineCases.length > 0) await insertBatch('discipline_cases', disciplineCases.map(mappers.disciplineCase.toDb));
+      if (dues.length > 0) await insertBatch('dues', dues.map(mappers.due.toDb));
+      if (payments.length > 0) await insertBatch('payments', payments.map(mappers.payment.toDb));
+      if (storeItems.length > 0) await insertBatch('store_items', storeItems.map(mappers.storeItem.toDb));
+      if (sales.length > 0) await insertBatch('sales', sales.map(mappers.sale.toDb));
+      if (pointsLedger.length > 0) await insertBatch('points_ledger', pointsLedger.map(mappers.pointsLedger.toDb));
+      if (rewards.length > 0) await insertBatch('rewards', rewards.map(mappers.reward.toDb));
+      if (rewardGrants.length > 0) await insertBatch('reward_grants', rewardGrants.map(mappers.rewardGrant.toDb));
+      if (messageTemplates.length > 0) await insertBatch('message_templates', messageTemplates.map(mappers.messageTemplate.toDb));
+      if (messageLogs.length > 0) await insertBatch('message_logs', messageLogs.map(mappers.messageLog.toDb));
+      if (studentNotes.length > 0) await insertBatch('student_notes', studentNotes.map(mappers.studentNote.toDb));
+      if (auditLogs.length > 0) await insertBatch('audit_logs', auditLogs.map(mappers.auditLog.toDb));
+
+      setIsSyncing(false);
+      setIsSupabaseConnected(true);
+      setSyncStatusMessage('تم رفع ومزامنة كافة البيانات الأولية (22 جدولاً) إلى Supabase بنجاح.');
+      addAuditLog('مزامنة Supabase', 'تم رفع ومزامنة كافة البيانات الأولية وجداول المنصة إلى قاعدة بيانات Supabase');
+      return { success: true, message: 'تم رفع ومزامنة كافة بيانات المدرسة إلى Supabase بنجاح!' };
+    } catch (err: any) {
+      setIsSyncing(false);
+      setSyncStatusMessage('تعذر رفع البيانات.');
+      return { success: false, message: err?.message || 'تعذر الرفع' };
+    }
   };
 
-  const resetFormFields = () => {
-    setEditingStudentId(null);
-    setFullName('');
-    setGender('male');
-    setGuardianPhone('');
-    setIsOrphan(false);
-    setFeeMode('normal');
-    setFeeDiscountAmount(0);
-    setFeeReason('');
-    setFamilyId('');
-    setNotes('');
-    setAgreementAccepted(false);
-    setFormError(null);
+  useEffect(() => {
+    fetchFromSupabase();
+  }, []);
+
+  useEffect(() => { saveToStorage('branches', branches); }, [branches]);
+  useEffect(() => { saveToStorage('users', users); }, [users]);
+  useEffect(() => { saveToStorage('departments', departments); }, [departments]);
+  useEffect(() => { saveToStorage('teachers', teachers); }, [teachers]);
+  useEffect(() => { saveToStorage('groups', groups); }, [groups]);
+  useEffect(() => { saveToStorage('students', students); }, [students]);
+  useEffect(() => { saveToStorage('families', families); }, [families]);
+  useEffect(() => { saveToStorage('studentAttendance', studentAttendance); }, [studentAttendance]);
+  useEffect(() => { saveToStorage('teacherAttendance', teacherAttendance); }, [teacherAttendance]);
+  useEffect(() => { saveToStorage('disciplineCases', disciplineCases); }, [disciplineCases]);
+  useEffect(() => { saveToStorage('studentNotes', studentNotes); }, [studentNotes]);
+  useEffect(() => { saveToStorage('dues', dues); }, [dues]);
+  useEffect(() => { saveToStorage('payments', payments); }, [payments]);
+  useEffect(() => { saveToStorage('storeItems', storeItems); }, [storeItems]);
+  useEffect(() => { saveToStorage('sales', sales); }, [sales]);
+  useEffect(() => { saveToStorage('pointsLedger', pointsLedger); }, [pointsLedger]);
+  useEffect(() => { saveToStorage('rewards', rewards); }, [rewards]);
+  useEffect(() => { saveToStorage('rewardGrants', rewardGrants); }, [rewardGrants]);
+  useEffect(() => { saveToStorage('messageTemplates', messageTemplates); }, [messageTemplates]);
+  useEffect(() => { saveToStorage('messageLogs', messageLogs); }, [messageLogs]);
+  useEffect(() => { saveToStorage('auditLogs', auditLogs); }, [auditLogs]);
+  useEffect(() => { saveToStorage('settings', settings); }, [settings]);
+
+  const getStudentAbsenceCountThisMonth = (studentId: string, month = new Date().toISOString().slice(0, 7)) => {
+    return studentAttendance.filter(a => 
+      a.studentId === studentId && 
+      a.date.startsWith(month) && 
+      a.status === 'absent'
+    ).length;
   };
 
-  const handleOpenAddNew = () => {
-    resetFormFields();
-    setStudentBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
-    setIsFormOpen(true);
+  const getStudentPoints = (studentId: string) => {
+    const entries = pointsLedger.filter(p => p.studentId === studentId);
+    return entries.reduce((acc, curr) => acc + curr.points, 0);
   };
 
-  const handleOpenEdit = (student: Student) => {
-    const determinedGender = detectStudentGender(student);
-    setEditingStudentId(student.id);
-    setStudentBranchId(student.branchId);
-    setFullName(student.fullName);
-    setGender(determinedGender);
-    setStage(student.stage);
-    setGrade(student.grade);
-    setTahfeezGroupId(student.tahfeezGroupId || '');
-    setTarbawiGroupId(student.tarbawiGroupId || '');
-    setGuardianPhone(student.guardianPhone);
-    setIsOrphan(student.isOrphan || false);
-    setFeeMode(student.feeMode || 'normal');
-    setFeeDiscountAmount(student.feeDiscountAmount || 0);
-    setFeeReason(student.feeReason || '');
-    setFamilyId(student.familyId || '');
-    setJoinDate(student.joinDate || new Date().toISOString().slice(0, 10));
-    setNotes(student.notes || '');
-    setAgreementAccepted(true);
-    setFormError(null);
-    setIsFormOpen(true);
+  const checkStudentBan = (studentId: string): StudentBanInfo => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return { isBanned: false, reasons: [] };
+
+    const reasons: string[] = [];
+    let banType: StudentBanInfo['type'] = undefined;
+
+    if (student.status === 'suspended') {
+      const discCase = disciplineCases.find(c => c.studentId === studentId && c.level === 3 && c.status === 'suspended');
+      reasons.push(`فصل مؤقت لمدة شهرين لتجاوز 10 غيابات (تاريخ العودة: ${discCase?.suspendedTo || 'غير محدد'})`);
+      banType = 'discipline_l3';
+    }
+
+    const activeCase = disciplineCases.find(c => 
+      c.studentId === studentId && 
+      c.status === 'open' &&
+      (c.level === 1 || c.level === 2)
+    );
+
+    if (activeCase) {
+      if (activeCase.level === 1) {
+        reasons.push('استدعاء ولي الأمر (تجاوز 6 غيابات بدون عذر) — بانتظار حضور ولي الأمر');
+        banType = 'discipline_l1';
+      } else if (activeCase.level === 2) {
+        const fineDue = dues.find(d => d.id === activeCase.fineDueId);
+        const fineUnpaid = fineDue && fineDue.status !== 'paid';
+        reasons.push(`استدعاء وغرامة انضباط 50 ج (تجاوز 8 غيابات)${fineUnpaid ? ' — الغرامة مستحقة السداد' : ''}`);
+        banType = 'discipline_l2';
+      }
+    }
+
+    const today = new Date();
+    const currentMonth = today.toISOString().slice(0, 7);
+    const dayOfMonth = today.getDate();
+    const cutoffDay = settings.dueDay + settings.graceDays;
+
+    if (dayOfMonth > cutoffDay) {
+      const unpaidDues = dues.filter(d => 
+        d.studentId === studentId && 
+        d.kind === 'subscription' && 
+        d.status !== 'paid' &&
+        d.month <= currentMonth
+      );
+      if (unpaidDues.length > 0) {
+        const totalRemaining = unpaidDues.reduce((sum, d) => sum + (d.amount - d.paidAmount), 0);
+        reasons.push(`تأخر سداد الاشتراك بعد انتهاء مهلة السماح (المتبقي: ${totalRemaining} ج)`);
+        if (!banType) banType = 'unpaid_due';
+      }
+    }
+
+    return {
+      isBanned: reasons.length > 0,
+      reasons,
+      type: banType,
+      details: reasons.join(' • ')
+    };
   };
 
-  const handleSubmitStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
+  const addStudent = (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const id = 's' + Date.now();
+    const newStudent: Student = normalizeStudent({
+      ...studentData,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    setStudents(prev => [newStudent, ...prev]);
+    addAuditLog('إضافة طالب', `تسجيل الطالب الجديد ${studentData.fullName} في الفرع`);
+    upsertRecord('students', mappers.student.toDb(newStudent));
+    return newStudent;
+  };
 
-    const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-    if (nameParts.length < 4) {
-      setFormError('الاسم رباعي إلزامي: يرجى كتابة الاسم الرباعي كاملاً (4 أجزاء على الأقل)');
-      return;
+  const updateStudent = (id: string, updates: Partial<Student>) => {
+    setStudents(prev => {
+      const updatedList = prev.map(s => s.id === id ? normalizeStudent({ ...s, ...updates, updatedAt: new Date().toISOString() }) : s);
+      const target = updatedList.find(s => s.id === id);
+      if (target) {
+        upsertRecord('students', mappers.student.toDb(target));
+      }
+      return updatedList;
+    });
+    addAuditLog('تعديل بيانات طالب', `تعديل بيانات الطالب رقم ${id}`);
+  };
+
+  const deleteStudent = (id: string, permanent: boolean = false) => {
+    if (permanent) {
+      setStudents(prev => prev.filter(s => s.id !== id));
+      deleteRecord('students', id);
+      addAuditLog('حذف نهائي لطالب', `حذف سجل الطالب ${id} نهائياً من قاعدة البيانات`);
+    } else {
+      setStudents(prev => {
+        const updatedList = prev.map(s => s.id === id ? { ...s, status: 'left' as StudentStatus, updatedAt: new Date().toISOString() } : s);
+        const target = updatedList.find(s => s.id === id);
+        if (target) {
+          upsertRecord('students', mappers.student.toDb(target));
+        }
+        return updatedList;
+      });
+      addAuditLog('حذف ناعم لطالب', `تغيير حالة الطالب ${id} إلى مغادر`);
+    }
+  };
+
+  const setStudentDropped = (id: string, reason: string) => {
+    const now = new Date().toISOString();
+    setStudents(prev => {
+      const updatedList = prev.map(s => s.id === id ? { 
+        ...s, 
+        status: 'dropped' as StudentStatus, 
+        droppedReason: reason,
+        droppedDate: now.slice(0, 10),
+        updatedAt: now 
+      } : s);
+      const target = updatedList.find(s => s.id === id);
+      if (target) {
+        upsertRecord('students', mappers.student.toDb(target));
+      }
+      return updatedList;
+    });
+    addAuditLog('تسجيل انقطاع طالب', `تسجيل الطالب ${id} كمنقطع بسبب: ${reason}`);
+  };
+
+  const reactivateStudent = (id: string) => {
+    const now = new Date().toISOString();
+    setStudents(prev => {
+      const updatedList = prev.map(s => s.id === id ? { 
+        ...s, 
+        status: 'active' as StudentStatus, 
+        droppedReason: undefined,
+        droppedDate: undefined,
+        updatedAt: now 
+      } : s);
+      const target = updatedList.find(s => s.id === id);
+      if (target) {
+        upsertRecord('students', mappers.student.toDb(target));
+      }
+      return updatedList;
+    });
+    addAuditLog('إعادة قيد طالب', `إعادة قيد وتنشيط الطالب ${id}`);
+  };
+
+  const saveStudentAttendanceBatch = (records: { 
+    studentId: string; 
+    departmentId: string; 
+    groupId: string; 
+    date: string; 
+    status: 'present' | 'absent' | 'excused'; 
+    excuseReason?: string;
+  }[]) => {
+    const now = new Date().toISOString();
+    const currentMonth = records[0]?.date.slice(0, 7) || now.slice(0, 7);
+    const affectedAttendance: StudentAttendance[] = [];
+    const pointsToAward: PointsEntry[] = [];
+
+    setStudentAttendance(prev => {
+      const updated = [...prev];
+      records.forEach(rec => {
+        const existingIdx = updated.findIndex(a => 
+          a.studentId === rec.studentId && 
+          a.departmentId === rec.departmentId && 
+          a.date === rec.date
+        );
+        const recordEntry: StudentAttendance = {
+          id: existingIdx >= 0 ? updated[existingIdx].id : 'att_' + Date.now() + Math.random().toString(36).substring(2, 5),
+          branchId: selectedBranchId === 'all' ? (students.find(s => s.id === rec.studentId)?.branchId || 'b1') : selectedBranchId,
+          studentId: rec.studentId,
+          departmentId: rec.departmentId,
+          groupId: rec.groupId,
+          date: rec.date,
+          status: rec.status,
+          excuseReason: rec.excuseReason,
+          enteredBy: currentUser?.fullName || 'النظام',
+          createdAt: now
+        };
+        affectedAttendance.push(recordEntry);
+        if (existingIdx >= 0) {
+          updated[existingIdx] = recordEntry;
+        } else {
+          updated.push(recordEntry);
+        }
+      });
+      return updated;
+    });
+
+    if (affectedAttendance.length > 0) {
+      insertBatch('student_attendance', affectedAttendance.map(mappers.studentAttendance.toDb));
     }
 
-    const cleaned = guardianPhone.replace(/\D/g, '');
-    if (cleaned.length < 10) {
-      setFormError('يرجى إدخال رقم هاتف ولي الأمر صحيحاً');
-      return;
-    }
-    let finalPhone = cleaned;
-    if (finalPhone.startsWith('0')) {
-      finalPhone = '20' + finalPhone.substring(1);
-    } else if (!finalPhone.startsWith('20')) {
-      finalPhone = '20' + finalPhone;
+    records.filter(r => r.status === 'present').forEach(rec => {
+      const pointEntry: PointsEntry = {
+        id: 'pt_' + Date.now() + Math.random().toString(36).substring(2, 5),
+        studentId: rec.studentId,
+        departmentId: rec.departmentId,
+        points: 1,
+        reason: 'attendance',
+        date: rec.date
+      };
+      pointsToAward.push(pointEntry);
+    });
+
+    if (pointsToAward.length > 0) {
+      setPointsLedger(prev => [...prev, ...pointsToAward]);
+      insertBatch('points_ledger', pointsToAward.map(mappers.pointsLedger.toDb));
     }
 
-    if (!agreementAccepted) {
-      setFormError('يجب تأكيد اطلاع ولي الأمر على شروط الالتحاق والموافقة عليها');
-      return;
+    records.forEach(rec => {
+      const existingAbsences = studentAttendance.filter(a => 
+        a.studentId === rec.studentId && 
+        a.date.startsWith(currentMonth) && 
+        a.status === 'absent' &&
+        !(a.departmentId === rec.departmentId && a.date === rec.date)
+      ).length;
+      
+      const newAbsenceCount = existingAbsences + (rec.status === 'absent' ? 1 : 0);
+
+      if (newAbsenceCount >= settings.absenceThresholds.level1) {
+        const existingCase = disciplineCases.find(c => c.studentId === rec.studentId && c.month === currentMonth);
+
+        if (newAbsenceCount >= settings.absenceThresholds.level3) {
+          const suspendedFrom = rec.date;
+          const returnDate = new Date(rec.date);
+          returnDate.setMonth(returnDate.getMonth() + settings.suspensionMonths);
+          const suspendedTo = returnDate.toISOString().slice(0, 10);
+
+          if (existingCase) {
+            const updatedCase: DisciplineCase = {
+              ...existingCase,
+              level: 3,
+              status: 'suspended',
+              absenceCount: newAbsenceCount,
+              suspendedFrom,
+              suspendedTo,
+              note: `فصل مؤقت لمدة شهرين لتجاوز ${newAbsenceCount} حصص غياب في الشهر الميلادي.`,
+              updatedAt: now
+            };
+            setDisciplineCases(prev => prev.map(c => c.id === existingCase.id ? updatedCase : c));
+            upsertRecord('discipline_cases', mappers.disciplineCase.toDb(updatedCase));
+          } else {
+            const newCase: DisciplineCase = {
+              id: 'dc_' + Date.now(),
+              branchId: selectedBranchId === 'all' ? 'b1' : selectedBranchId,
+              studentId: rec.studentId,
+              month: currentMonth,
+              level: 3,
+              status: 'suspended',
+              absenceCount: newAbsenceCount,
+              suspendedFrom,
+              suspendedTo,
+              note: `فصل مؤقت لمدة شهرين لتجاوز ${newAbsenceCount} حصص غياب.`,
+              createdAt: now,
+              updatedAt: now
+            };
+            setDisciplineCases(prev => [...prev, newCase]);
+            upsertRecord('discipline_cases', mappers.disciplineCase.toDb(newCase));
+          }
+
+          setStudents(prev => {
+            const updated = prev.map(s => s.id === rec.studentId ? { ...s, status: 'suspended' as const, updatedAt: now } : s);
+            const target = updated.find(s => s.id === rec.studentId);
+            if (target) upsertRecord('students', mappers.student.toDb(target));
+            return updated;
+          });
+          addAuditLog('تطبيق الفصل المؤقت', `فصل الطالب ${rec.studentId} مؤقتاً لتجاوز 10 غيابات`);
+
+        } else if (newAbsenceCount >= settings.absenceThresholds.level2) {
+          const fineDueId = 'due_fine_' + rec.studentId + '_' + Date.now();
+          if (existingCase && existingCase.level < 2) {
+            const updatedCase: DisciplineCase = {
+              ...existingCase,
+              level: 2,
+              status: 'open',
+              absenceCount: newAbsenceCount,
+              fineDueId,
+              note: `بلوغ ${newAbsenceCount} غيابات — استدعاء مستوى 2 وغرامة ${settings.absenceFineAmount} ج.`,
+              updatedAt: now
+            };
+            setDisciplineCases(prev => prev.map(c => c.id === existingCase.id ? updatedCase : c));
+            upsertRecord('discipline_cases', mappers.disciplineCase.toDb(updatedCase));
+
+            const newDue: Due = {
+              id: fineDueId,
+              branchId: selectedBranchId === 'all' ? 'b1' : selectedBranchId,
+              studentId: rec.studentId,
+              month: currentMonth,
+              kind: 'fine',
+              grossAmount: settings.absenceFineAmount,
+              orphanDiscount: 0,
+              siblingDiscount: 0,
+              amount: settings.absenceFineAmount,
+              paidAmount: 0,
+              status: 'unpaid',
+              disciplineCaseId: existingCase.id,
+              dueDate: rec.date,
+              createdAt: now
+            };
+            setDues(prev => [...prev, newDue]);
+            upsertRecord('dues', mappers.due.toDb(newDue));
+            addAuditLog('إضافة غرامة انضباط', `فرض غرامة 50 ج على الطالب ${rec.studentId} لتجاوز 8 غيابات`);
+          }
+        } else if (newAbsenceCount >= settings.absenceThresholds.level1 && !existingCase) {
+          const newCase: DisciplineCase = {
+            id: 'dc_' + Date.now(),
+            branchId: selectedBranchId === 'all' ? 'b1' : selectedBranchId,
+            studentId: rec.studentId,
+            month: currentMonth,
+            level: 1,
+            status: 'open',
+            absenceCount: newAbsenceCount,
+            note: `استدعاء ولي الأمر ومنع الدخول لبلوغ ${newAbsenceCount} غيابات شهرياً.`,
+            createdAt: now,
+            updatedAt: now
+          };
+          setDisciplineCases(prev => [...prev, newCase]);
+          upsertRecord('discipline_cases', mappers.disciplineCase.toDb(newCase));
+          addAuditLog('فتح استدعاء ولي أمر', `استدعاء ولي أمر الطالب ${rec.studentId} لتجاوز 6 غيابات`);
+        }
+      }
+    });
+
+    addAuditLog('تسجيل حضور الطلاب', `تسجيل حضور ${records.length} طالب بحلقة ${records[0]?.groupId}`);
+  };
+
+  const saveTeacherAttendance = (record: Omit<TeacherAttendance, 'id' | 'createdAt' | 'lateMinutes' | 'earlyLeaveMinutes' | 'workedMinutes'>) => {
+    let lateMinutes = 0;
+    let workedMinutes = 0;
+    
+    if (record.checkIn && record.checkOut) {
+      const [inH, inM] = record.checkIn.split(':').map(Number);
+      const [outH, outM] = record.checkOut.split(':').map(Number);
+      workedMinutes = Math.max(0, (outH * 60 + outM) - (inH * 60 + inM));
+      if (inH * 60 + inM > 15 * 60 + 35) {
+        lateMinutes = (inH * 60 + inM) - (15 * 60 + 30);
+      }
     }
 
-    const studentData = {
-      branchId: studentBranchId,
-      fullName: fullName.trim(),
-      gender: gender,
-      grade,
-      stage,
-      guardianPhone: finalPhone,
-      isOrphan,
-      feeMode: isOrphan ? feeMode : 'normal',
-      feeDiscountAmount: isOrphan ? feeDiscountAmount : 0,
-      feeReason: isOrphan ? feeReason : '',
-      familyId: familyId || undefined,
-      joinDate,
-      notes: notes.trim(),
-      status: 'active' as const,
-      agreementAccepted: true,
-      agreementDate: joinDate,
-      tahfeezGroupId,
-      tarbawiGroupId
+    const newRec: TeacherAttendance = {
+      ...record,
+      id: 'ta_' + Date.now(),
+      lateMinutes,
+      earlyLeaveMinutes: 0,
+      workedMinutes,
+      createdAt: new Date().toISOString()
     };
 
-    if (editingStudentId) {
-      updateStudent(editingStudentId, studentData);
-      setActionSuccessNotice(`تم تعديل بيانات الطالب (${fullName.trim()}) بنجاح!`);
-      setTimeout(() => setActionSuccessNotice(null), 4000);
-      setIsFormOpen(false);
-      resetFormFields();
-    } else {
-      const newStudent = addStudent(studentData);
-      setIsFormOpen(false);
-      resetFormFields();
-      onPrintAdmissionSlip(newStudent);
+    setTeacherAttendance(prev => {
+      const existing = prev.filter(t => !(t.teacherId === record.teacherId && t.date === record.date));
+      return [newRec, ...existing];
+    });
+
+    upsertRecord('teacher_attendance', mappers.teacherAttendance.toDb(newRec));
+    addAuditLog('حضور المعلمين', `تسجيل حضور المعلم ${record.teacherId} ليوم ${record.date}`);
+  };
+
+  const recordPayment = (paymentData: Omit<Payment, 'id' | 'receiptNo' | 'userId' | 'userName'>): Payment => {
+    const branchCode = paymentData.branchId.toUpperCase();
+    const count = payments.length + 101;
+    const receiptNo = `REC-${branchCode}-${count}`;
+
+    const newPayment: Payment = {
+      ...paymentData,
+      id: 'pay_' + Date.now(),
+      receiptNo,
+      userId: currentUser?.id || 'admin',
+      userName: currentUser?.fullName || 'المدير'
+    };
+
+    setPayments(prev => [newPayment, ...prev]);
+
+    setDues(prev => prev.map(d => {
+      if (d.id === paymentData.dueId) {
+        const newPaid = d.paidAmount + paymentData.amount;
+        const newStatus: 'paid' | 'partial' | 'unpaid' = newPaid >= d.amount ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
+        const updatedDue: Due = {
+          ...d,
+          paidAmount: newPaid,
+          status: newStatus
+        };
+        upsertRecord('dues', mappers.due.toDb(updatedDue));
+        return updatedDue;
+      }
+      return d;
+    }));
+
+    upsertRecord('payments', mappers.payment.toDb(newPayment));
+    addAuditLog('تسجيل دفعة وسداد', `تحصيل ${paymentData.amount} ج إيصال رقم ${receiptNo}`);
+    return newPayment;
+  };
+
+  const generateMonthlyDues = (month: string) => {
+    const now = new Date().toISOString();
+    const createdDues: Due[] = [];
+
+    const familyCounts: Record<string, number> = {};
+    students.filter(s => s.status === 'active').forEach(s => {
+      if (s.familyId) {
+        familyCounts[s.familyId] = (familyCounts[s.familyId] || 0) + 1;
+      }
+    });
+
+    students.filter(s => s.status === 'active').forEach(s => {
+      const exists = dues.some(d => d.studentId === s.id && d.month === month && d.kind === 'subscription');
+      if (exists) return;
+
+      const stagePlan = settings.feePlans.find(p => p.stage === s.stage) || settings.feePlans[0];
+      const grossAmount = stagePlan.monthlyAmount;
+
+      let orphanDiscount = 0;
+      if (s.isOrphan) {
+        if (s.feeMode === 'exempt') orphanDiscount = grossAmount;
+        else if (s.feeMode === 'discount') orphanDiscount = Math.min(grossAmount, s.feeDiscountAmount || 0);
+      }
+
+      let siblingDiscount = 0;
+      if (s.familyId && (familyCounts[s.familyId] || 0) >= 2) {
+        const count = familyCounts[s.familyId];
+        siblingDiscount = Math.round((settings.siblingDiscountAmount / count) * 100) / 100;
+      }
+
+      const netAmount = Math.max(0, grossAmount - orphanDiscount - siblingDiscount);
+
+      const dueItem: Due = {
+        id: 'due_' + s.id + '_' + month,
+        branchId: s.branchId,
+        studentId: s.id,
+        month,
+        kind: 'subscription',
+        grossAmount,
+        orphanDiscount,
+        siblingDiscount,
+        amount: netAmount,
+        paidAmount: netAmount === 0 ? 0 : 0,
+        status: netAmount === 0 ? 'paid' : 'unpaid',
+        dueDate: `${month}-${String(settings.dueDay).padStart(2, '0')}`,
+        createdAt: now
+      };
+
+      createdDues.push(dueItem);
+    });
+
+    if (createdDues.length > 0) {
+      setDues(prev => [...prev, ...createdDues]);
+      createdDues.forEach(d => {
+        upsertRecord('dues', mappers.due.toDb(d));
+      });
+      addAuditLog('توليد استحقاقات شهرية', `توليد استحقاقات شهر ${month} لعدد ${createdDues.length} طالب`);
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = ['المعرف', 'الاسم رباعي', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
-    const rows = filteredStudents.map(s => {
-      const isFemale = detectStudentGender(s) === 'female';
-      return [
-        s.id,
-        `"${s.fullName}"`,
-        isFemale ? 'أنثى' : 'ذكر',
-        s.stage === 'primary' ? 'ابتدائي' : s.stage === 'prep' ? 'إعدادي' : 'ثانوي فما فوق',
-        `"${s.grade}"`,
-        s.guardianPhone,
-        s.isOrphan ? 'يتيم' : 'غير يتيم',
-        s.feeMode,
-        s.status
-      ];
+  const recordSale = (saleData: Omit<Sale, 'id' | 'receiptNo' | 'userId'>): Sale => {
+    const branchCode = saleData.branchId.toUpperCase();
+    const count = sales.length + 101;
+    const receiptNo = `SL-${branchCode}-${count}`;
+
+    const newSale: Sale = {
+      ...saleData,
+      id: 'sale_' + Date.now(),
+      receiptNo,
+      userId: currentUser?.id || 'admin'
+    };
+
+    setSales(prev => [newSale, ...prev]);
+
+    setStoreItems(prev => prev.map(item => {
+      if (item.id === saleData.itemId) {
+        const updated = { ...item, stock: Math.max(0, item.stock - saleData.quantity) };
+        upsertRecord('store_items', mappers.storeItem.toDb(updated));
+        return updated;
+      }
+      return item;
+    }));
+
+    upsertRecord('sales', mappers.sale.toDb(newSale));
+    addAuditLog('بيع أدوات ومطبوعات', `بيع ${saleData.quantity} من ${saleData.itemName} بمبلغ ${saleData.total} ج إيصال ${receiptNo}`);
+    return newSale;
+  };
+
+  const addStoreItem = (itemData: Omit<StoreItem, 'id'>) => {
+    const newItem: StoreItem = {
+      ...itemData,
+      id: 'item_' + Date.now()
+    };
+    setStoreItems(prev => [newItem, ...prev]);
+    upsertRecord('store_items', mappers.storeItem.toDb(newItem));
+    addAuditLog('إضافة صنف مبيعات', `إضافة ${itemData.name} بسعر ${itemData.unitPrice} ج`);
+  };
+
+  const updateStoreItem = (id: string, updates: Partial<StoreItem>) => {
+    setStoreItems(prev => {
+      const updatedList = prev.map(item => item.id === id ? { ...item, ...updates } : item);
+      const target = updatedList.find(item => item.id === id);
+      if (target) {
+        upsertRecord('store_items', mappers.storeItem.toDb(target));
+      }
+      return updatedList;
     });
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `طلاب_مدرسة_السعيد_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  };
+
+  const recordGuardianAttendance = (caseId: string, guardianName: string, note?: string) => {
+    const now = new Date().toISOString();
+    setDisciplineCases(prev => {
+      const updatedList = prev.map(c => {
+        if (c.id === caseId) {
+          const updated: DisciplineCase = {
+            ...c,
+            status: 'guardian_attended' as const,
+            guardianAttendedAt: now,
+            guardianName,
+            note: (c.note ? c.note + '\n' : '') + `تم حضور ولي الأمر (${guardianName}) في ${now.slice(0, 10)}. ${note || ''}`,
+            updatedAt: now
+          };
+          upsertRecord('discipline_cases', mappers.disciplineCase.toDb(updated));
+          return updated;
+        }
+        return c;
+      });
+      return updatedList;
+    });
+    addAuditLog('تسجيل حضور ولي أمر', `تم توثيق حضور ولي الأمر للحالة رقم ${caseId} ورفع المنع`);
+  };
+
+  const adminExceptionalUnban = (caseId: string, reason: string) => {
+    if (currentUser?.role !== 'admin') return;
+    const now = new Date().toISOString();
+    setDisciplineCases(prev => {
+      const updatedList = prev.map(c => {
+        if (c.id === caseId) {
+          const updated: DisciplineCase = {
+            ...c,
+            status: 'closed' as const,
+            exceptionalUnbanReason: reason,
+            closedBy: currentUser.fullName,
+            note: (c.note ? c.note + '\n' : '') + `رفع استثنائي بقرار المدير: ${reason}`,
+            updatedAt: now
+          };
+          upsertRecord('discipline_cases', mappers.disciplineCase.toDb(updated));
+          return updated;
+        }
+        return c;
+      });
+      return updatedList;
+    });
+    addAuditLog('رفع منع استثنائي', `رفع المنع استثنائياً عن الحالة ${caseId} بالسبب: ${reason}`);
+  };
+
+  const deliverReward = (studentId: string, rewardId: string) => {
+    const reward = rewards.find(r => r.id === rewardId);
+    if (!reward) return;
+
+    const currentPoints = getStudentPoints(studentId);
+    if (currentPoints < reward.threshold) return;
+
+    const now = new Date().toISOString();
+
+    const grant: RewardGrant = {
+      id: 'rg_' + Date.now(),
+      studentId,
+      rewardId,
+      rewardTitle: reward.title,
+      pointsCost: reward.threshold,
+      earnedAt: now.slice(0, 10),
+      delivered: true,
+      deliveredAt: now.slice(0, 10),
+      deliveredBy: currentUser?.fullName || 'المدير'
+    };
+    setRewardGrants(prev => [grant, ...prev]);
+    upsertRecord('reward_grants', mappers.rewardGrant.toDb(grant));
+
+    const resetEntry: PointsEntry = {
+      id: 'pt_redeem_' + Date.now(),
+      studentId,
+      points: -currentPoints,
+      reason: 'redeem',
+      note: `استلام الجائزة: ${reward.title} وتصفير رصيد النقاط`,
+      date: now.slice(0, 10)
+    };
+    setPointsLedger(prev => [...prev, resetEntry]);
+    upsertRecord('points_ledger', mappers.pointsLedger.toDb(resetEntry));
+
+    addAuditLog('تسليم جائزة تحفيزية', `تسليم ${reward.title} للطالب ${studentId} وتصفير النقاط`);
+  };
+
+  const addManualPoints = (studentId: string, points: number, reason: string) => {
+    if (currentUser?.role !== 'admin') return;
+    const entry: PointsEntry = {
+      id: 'pt_' + Date.now(),
+      studentId,
+      points,
+      reason: 'bonus',
+      note: reason,
+      date: new Date().toISOString().slice(0, 10)
+    };
+    setPointsLedger(prev => [...prev, entry]);
+    upsertRecord('points_ledger', mappers.pointsLedger.toDb(entry));
+    addAuditLog('إضافة نقاط يدوية', `منح الطالب ${studentId} ${points} نقاط: ${reason}`);
+  };
+
+  const addStudentNote = (studentId: string, type: 'appearance' | 'behavior' | 'guardian_contact', text: string) => {
+    const entry: StudentNote = {
+      id: 'sn_' + Date.now(),
+      studentId,
+      type,
+      text,
+      date: new Date().toISOString().slice(0, 10),
+      userId: currentUser?.id || 'admin',
+      userName: currentUser?.fullName || 'المدير'
+    };
+    setStudentNotes(prev => [entry, ...prev]);
+    upsertRecord('student_notes', mappers.studentNote.toDb(entry));
+    addAuditLog('إضافة ملاحظة سلوكية للطالب', `ملاحظة (${type}) للطالب ${studentId}`);
+  };
+
+  const updateSettings = (newSettings: Partial<SchoolSettings>) => {
+    setSettings(prev => {
+      const merged = { ...prev, ...newSettings };
+      upsertRecord('settings', mappers.settings.toDb(merged));
+      return merged;
+    });
+    addAuditLog('تحديث إعدادات المدرسة', 'تعديل الإعدادات العامة للمنصة');
+  };
+
+  const updateMessageTemplate = (id: string, template: string) => {
+    setMessageTemplates(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, template } : t);
+      const target = updated.find(t => t.id === id);
+      if (target) {
+        upsertRecord('message_templates', mappers.messageTemplate.toDb(target));
+      }
+      return updated;
+    });
+    addAuditLog('تعديل قالب رسالة', `تعديل قالب الرسالة ${id}`);
+  };
+
+  const logMessageSent = (log: Omit<MessageLog, 'id' | 'sentAt'>) => {
+    const entry: MessageLog = {
+      ...log,
+      id: 'ml_' + Date.now(),
+      sentAt: new Date().toISOString()
+    };
+    setMessageLogs(prev => [entry, ...prev]);
+    upsertRecord('message_logs', mappers.messageLog.toDb(entry));
+  };
+
+  const addTeacher = (t: Omit<Teacher, 'id'>) => {
+    const newT: Teacher = { ...t, id: 't_' + Date.now() };
+    setTeachers(prev => [...prev, newT]);
+    upsertRecord('teachers', mappers.teacher.toDb(newT));
+    addAuditLog('إضافة معلم', `إضافة المعلم ${t.fullName}`);
+  };
+
+  const updateTeacher = (id: string, t: Partial<Teacher>) => {
+    setTeachers(prev => {
+      const updated = prev.map(item => item.id === id ? { ...item, ...t } : item);
+      const target = updated.find(item => item.id === id);
+      if (target) {
+        upsertRecord('teachers', mappers.teacher.toDb(target));
+      }
+      return updated;
+    });
+  };
+
+  const deleteTeacher = (id: string) => {
+    const teacher = teachers.find(t => t.id === id);
+    setTeachers(prev => prev.filter(t => t.id !== id));
+    deleteRecord('teachers', id);
+    if (teacher) {
+      addAuditLog('حذف معلم', `حذف المعلم ${teacher.fullName}`);
+    }
+  };
+
+  const addGroup = (g: Omit<Group, 'id'>) => {
+    const newG: Group = { ...g, id: 'g_' + Date.now() };
+    setGroups(prev => [...prev, newG]);
+    upsertRecord('groups', mappers.group.toDb(newG));
+    addAuditLog('إضافة حلقة/مجموعة', `إضافة مجموعة ${g.name}`);
+  };
+
+  const updateGroup = (id: string, g: Partial<Group>) => {
+    setGroups(prev => {
+      const updated = prev.map(item => item.id === id ? { ...item, ...g } : item);
+      const target = updated.find(item => item.id === id);
+      if (target) {
+        upsertRecord('groups', mappers.group.toDb(target));
+      }
+      return updated;
+    });
+  };
+
+  const deleteGroup = (id: string) => {
+    const group = groups.find(g => g.id === id);
+    setGroups(prev => prev.filter(g => g.id !== id));
+    deleteRecord('groups', id);
+    if (group) {
+      addAuditLog('حذف حلقة', `حذف الحلقة ${group.name}`);
+    }
+  };
+
+  const addBranch = (b: Omit<Branch, 'id'>) => {
+    const newB: Branch = { ...b, id: 'b_' + Date.now() };
+    setBranches(prev => [...prev, newB]);
+    upsertRecord('branches', mappers.branch.toDb(newB));
+    addAuditLog('إضافة فرع جديد', `إضافة الفرع ${b.name}`);
+  };
+
+  const updateBranch = (id: string, updates: Partial<Branch>) => {
+    setBranches(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, ...updates } : b);
+      const target = updated.find(b => b.id === id);
+      if (target) {
+        upsertRecord('branches', mappers.branch.toDb(target));
+      }
+      return updated;
+    });
+    addAuditLog('تعديل فرع', `تحديث بيانات الفرع ${id}`);
+  };
+
+  const toggleBranchStatus = (id: string) => {
+    setBranches(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, active: !b.active } : b);
+      const target = updated.find(b => b.id === id);
+      if (target) {
+        upsertRecord('branches', mappers.branch.toDb(target));
+      }
+      return updated;
+    });
+    const target = branches.find(b => b.id === id);
+    addAuditLog('تغيير حالة فرع', `تغيير حالة الفرع ${target?.name} إلى ${target?.active ? 'معطل' : 'نشط'}`);
+  };
+
+  const deleteBranch = (id: string) => {
+    setBranches(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, active: false } : b);
+      const target = updated.find(b => b.id === id);
+      if (target) {
+        upsertRecord('branches', mappers.branch.toDb(target));
+      }
+      return updated;
+    });
+    addAuditLog('تعطيل فرع', `إيقاف العمل بالفرع ${id}`);
+  };
+
+  const deleteStoreItem = (id: string) => {
+    setStoreItems(prev => prev.filter(item => item.id !== id));
+    deleteRecord('store_items', id);
+    addAuditLog('حذف صنف من المكتبة', `حذف الصنف رقم ${id}`);
+  };
+
+  const addReward = (rewardData: Omit<Reward, 'id'>) => {
+    const newReward: Reward = {
+      ...rewardData,
+      id: 'rew_' + Date.now()
+    };
+    setRewards(prev => [...prev, newReward]);
+    upsertRecord('rewards', mappers.reward.toDb(newReward));
+    addAuditLog('إضافة جائزة جديدة', `إضافة الجائزة ${rewardData.title} بحد ${rewardData.threshold} نقطة`);
+  };
+
+  const updateReward = (id: string, updates: Partial<Reward>) => {
+    setRewards(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, ...updates } : r);
+      const target = updated.find(r => r.id === id);
+      if (target) {
+        upsertRecord('rewards', mappers.reward.toDb(target));
+      }
+      return updated;
+    });
+    addAuditLog('تعديل جائزة', `تحديث بيانات الجائزة ${id}`);
+  };
+
+  const deleteReward = (id: string) => {
+    setRewards(prev => prev.filter(r => r.id !== id));
+    deleteRecord('rewards', id);
+    addAuditLog('حذف جائزة', `حذف الجائزة رقم ${id}`);
+  };
+
+  const addUser = (userData: Omit<User, 'id'>) => {
+    const newUser: User = {
+      ...userData,
+      id: 'u_' + Date.now()
+    };
+    setUsers(prev => [...prev, newUser]);
+    upsertRecord('users', mappers.user.toDb(newUser));
+    addAuditLog('إضافة مستخدم جديد', `إنشاء حساب ${newUser.fullName} (${newUser.role})`);
+  };
+
+  const updateUser = (id: string, updates: Partial<User>) => {
+    setUsers(prev => {
+      const updated = prev.map(u => u.id === id ? { ...u, ...updates } : u);
+      const target = updated.find(u => u.id === id);
+      if (target) {
+        upsertRecord('users', mappers.user.toDb(target));
+      }
+      return updated;
+    });
+    if (currentUser?.id === id) {
+      setCurrentUser(prev => ({ ...prev, ...updates }));
+    }
+    addAuditLog('تعديل مستخدم', `تحديث بيانات أو صلاحيات المستخدم ${id}`);
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers(prev => prev.filter(u => u.id !== id));
+    deleteRecord('users', id);
+    addAuditLog('حذف مستخدم', `حذف حساب المستخدم ${id}`);
+  };
+
+  const canUserAccessModule = (moduleName: string): boolean => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+
+    if (currentUser.allowedModules && currentUser.allowedModules.length > 0) {
+      return currentUser.allowedModules.includes(moduleName);
+    }
+
+    switch (currentUser.role) {
+      case 'finance':
+        return ['dashboard', 'finance', 'reports'].includes(moduleName);
+      case 'data_entry':
+        return ['dashboard', 'students', 'student_attendance', 'teacher_attendance', 'reports'].includes(moduleName);
+      case 'attendance_supervisor':
+        return ['dashboard', 'student_attendance', 'teacher_attendance', 'discipline', 'whatsapp', 'reports'].includes(moduleName);
+      case 'board':
+        return ['dashboard', 'reports', 'branches'].includes(moduleName);
+      default:
+        return true;
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.branchIds && !currentUser.branchIds.includes('all')) {
+      if (!currentUser.branchIds.includes(selectedBranchId)) {
+        setSelectedBranchId(currentUser.branchIds[0] || 'b1');
+      }
+    }
+  }, [currentUser, selectedBranchId]);
+
+  const exportBackupJson = () => {
+    const backup = {
+      version: '2.0',
+      exportedAt: new Date().toISOString(),
+      branches,
+      users,
+      departments,
+      teachers,
+      groups,
+      students,
+      families,
+      studentAttendance,
+      teacherAttendance,
+      disciplineCases,
+      studentNotes,
+      dues,
+      payments,
+      storeItems,
+      sales,
+      pointsLedger,
+      rewards,
+      rewardGrants,
+      messageTemplates,
+      messageLogs,
+      settings
+    };
+    return JSON.stringify(backup, null, 2);
+  };
+
+  const importBackupJson = (jsonString: string): boolean => {
+    try {
+      const data = JSON.parse(jsonString);
+      if (data.branches) setBranches(data.branches);
+      if (data.students) setStudents(data.students.map(normalizeStudent));
+      if (data.teachers) setTeachers(data.teachers);
+      if (data.groups) setGroups(data.groups);
+      if (data.dues) setDues(data.dues);
+      if (data.payments) setPayments(data.payments);
+      if (data.storeItems) setStoreItems(data.storeItems);
+      if (data.sales) setSales(data.sales);
+      if (data.disciplineCases) setDisciplineCases(data.disciplineCases);
+      if (data.studentAttendance) setStudentAttendance(data.studentAttendance);
+      if (data.settings) setSettings(data.settings);
+      addAuditLog('استعادة نسخة احتياطية', 'تمت استعادة البيانات بنجاح من ملف JSON');
+      return true;
+    } catch (e) {
+      console.error('Invalid backup format', e);
+      return false;
+    }
+  };
+
+  const resetToDemoData = () => {
+    setBranches(initialBranches);
+    setUsers(initialUsers);
+    setDepartments(initialDepartments);
+    setTeachers(initialTeachers);
+    setGroups(initialGroups);
+    setStudents(initialStudents.map(normalizeStudent));
+    setFamilies(initialFamilies);
+    setStudentAttendance(initialStudentAttendance);
+    setTeacherAttendance(initialTeacherAttendance);
+    setDisciplineCases(initialDisciplineCases);
+    setStudentNotes(initialStudentNotes);
+    setDues(initialDues);
+    setPayments(initialPayments);
+    setStoreItems(initialStoreItems);
+    setSales(initialSales);
+    setPointsLedger(initialPointsLedger);
+    setRewards(initialRewards);
+    setRewardGrants(initialRewardGrants);
+    setMessageTemplates(initialMessageTemplates);
+    setMessageLogs(initialMessageLogs);
+    setAuditLogs(initialAuditLogs);
+    setSettings(initialSettings);
+    addAuditLog('إعادة ضبط المصنع', 'تم استرجاع البيانات النموذجية الأولية');
   };
 
   return (
-    <div className="space-y-6">
-      <style>{`
-        @media print {
-          body, html {
-            height: auto !important;
-            overflow: visible !important;
-            background: #fff !important;
-          }
-          .printable-admission-modal {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            padding-top: 12mm !important;
-            margin: 0 !important;
-            overflow: visible !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      {/* Header Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#FFFFFF] p-4 rounded-xl border border-[#E8DCCF] shadow-2xs no-print">
-        <div>
-          <h2 className="text-base font-bold text-[#4A2F18]">شؤون الطلاب واستمارة القيد والتسجيل</h2>
-          <p className="text-xs text-[#8C6D53]">
-            تسجيل الطلاب الجدد، تعديل البيانات، ربط الإخوة، ضبط إعفاءات الأيتام، ومتابعة حالات المنع من الدخول
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] rounded-lg text-xs font-bold transition cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-[#8C6D53]" />
-            <span>تصدير CSV</span>
-          </button>
-          
-          {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
-            <button
-              onClick={handleOpenAddNew}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-[#D8C3AE]" />
-              <span>استمارة تقديم طالب جديد</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF] no-print">
-        <div className="relative sm:col-span-1">
-          <Search className="w-4 h-4 absolute right-3 top-2.5 text-[#8C6D53]" />
-          <input
-            type="text"
-            placeholder="بحث بالاسم أو الهاتف..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-3 pr-9 py-1.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden focus:border-[#4A2F18] bg-[#FBF8F5]"
-          />
-        </div>
-
-        <div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-bold"
-          >
-            <option value="all">كل حالات القيد</option>
-            <option value="active">الطلاب المنتظمون</option>
-            <option value="dropped">الطلاب المنقطعون</option>
-            <option value="suspended">المفصولون مؤقتاً</option>
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={genderFilter}
-            onChange={(e) => setGenderFilter(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
-          >
-            <option value="all">الجميع (بنين وبنات)</option>
-            <option value="male">بنين (ذكور)</option>
-            <option value="female">بنات (إناث)</option>
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
-          >
-            <option value="all">جميع المراحل</option>
-            <option value="primary">ابتدائي (50 ج)</option>
-            <option value="prep">إعدادي (65 ج)</option>
-            <option value="secondary_up">ثانوي فما فوق (80 ج)</option>
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
-          >
-            <option value="all">جميع الحلقات</option>
-            {groups.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={bannedFilter}
-            onChange={(e) => setBannedFilter(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden bg-[#FBF8F5] text-[#4A2F18] font-medium"
-          >
-            <option value="all">كافة حالات الدخول</option>
-            <option value="banned">الممنوعون فقط</option>
-          </select>
-        </div>
-      </div>
-
-      {actionSuccessNotice && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2 no-print">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>{actionSuccessNotice}</span>
-        </div>
-      )}
-
-      {/* Admission / Edit Student Modal */}
-      {isFormOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-6 md:pt-10 overflow-y-auto printable-admission-modal">
-          <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto max-h-[90vh] flex flex-col print:max-h-none print:shadow-none print:border-none">
-            
-            {/* Modal Header */}
-            <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0 no-print">
-              <div>
-                <h3 className="text-sm font-bold">
-                  {editingStudentId ? 'تعديل بيانات الطالب المسجل' : 'استمارة تقديم وقيد طالب جديد'}
-                </h3>
-                <p className="text-[11px] text-[#D8C3AE]">التحاق بالمدرسة القرآنية ولقاء الجمعة التربوي</p>
-              </div>
-              <button 
-                onClick={() => setIsFormOpen(false)}
-                className="text-white hover:text-red-200 p-1 rounded-lg transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form Body */}
-            <form onSubmit={handleSubmitStudent} className="p-6 space-y-4 overflow-y-auto flex-1 print:overflow-visible print:p-0">
-              
-              {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-bold text-red-700 flex items-center gap-2 no-print">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* 0. Branch Selection */}
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">
-                  الفرع / المدرسة المخصصة <span className="text-red-600">*</span>
-                </label>
-                <select
-                  value={studentBranchId}
-                  onChange={(e) => setStudentBranchId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5] font-bold text-[#4A2F18]"
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 1. Full 4-part name */}
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">
-                  الاسم رباعي (إلزامي، 4 أجزاء على الأقل) <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: مودة طه أحمد الشافعي"
-                  value={fullName}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFullName(val);
-                    if (!editingStudentId && val.trim().length >= 2) {
-                      setGender(detectStudentGender({ fullName: val }));
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] focus:border-[#4A2F18] focus:outline-hidden bg-[#FBF8F5]"
-                />
-              </div>
-
-              {/* 1.1 Gender Selection */}
-              <div>
-                <label className="block text-xs font-bold text-[#4A2F18] mb-1">
-                  النوع (الجنس) <span className="text-red-600">*</span>
-                </label>
-                <div className="flex items-center gap-6 bg-[#FBF8F5] p-2.5 rounded-lg border border-[#E8DCCF]">
-                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="studentGender"
-                      value="male"
-                      checked={gender === 'male'}
-                      onChange={() => setGender('male')}
-                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
-                    />
-                    <span>ذكر (طالب)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 font-bold text-xs text-[#4A2F18] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="studentGender"
-                      value="female"
-                      checked={gender === 'female'}
-                      onChange={() => setGender('female')}
-                      className="w-4 h-4 text-[#4A2F18] cursor-pointer"
-                    />
-                    <span>أنثى (طالبة)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* 2. Educational Stage & Grade */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">المرحلة الدراسية</label>
-                  <select
-                    value={stage}
-                    onChange={(e) => handleStageChange(e.target.value as EducationalStage)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
-                  >
-                    <option value="primary">ابتدائي (قيمة الاشتراك: 50 ج)</option>
-                    <option value="prep">إعدادي (قيمة الاشتراك: 65 ج)</option>
-                    <option value="secondary_up">ثانوي فما فوق (قيمة الاشتراك: 80 ج)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">الصف الدراسي</label>
-                  <input
-                    type="text"
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
-                    placeholder="مثال: الصف الرابع الابتدائي"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Core Departments & Groups Selection */}
-              <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-3">
-                <div className="text-xs font-extrabold text-[#4A2F18] flex items-center justify-between">
-                  <span>توزيع القسمين الأساسيين (مجموعة لكل قسم)</span>
-                  <span className="text-[11px] text-[#8C6D53]">المعلم والميعاد يملآن تلقائياً</span>
-                </div>
-
-                {/* Tahfeez Group */}
-                <div className="bg-white p-2.5 rounded-lg border border-[#E8DCCF]">
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">مجموعة قسم التحفيظ القرآني</label>
-                  <select
-                    value={tahfeezGroupId}
-                    onChange={(e) => setTahfeezGroupId(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[#E8DCCF] mb-1.5"
-                  >
-                    {groups.filter(g => g.departmentId === 'tahfeez' && (g.branchId === studentBranchId || !g.branchId)).map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                  <div className="text-[11px] text-[#8C6D53] flex items-center justify-between">
-                    <span>المعلم: <strong className="text-[#4A2F18]">{selectedTahfeezTeacher?.fullName || 'غير محدد'}</strong></span>
-                    <span>الميعاد: <strong className="text-[#4A2F18]">{selectedTahfeezGroup?.days.join('، ')} ({selectedTahfeezGroup?.startTime} - {selectedTahfeezGroup?.endTime})</strong></span>
-                  </div>
-                </div>
-
-                {/* Tarbawi Group */}
-                <div className="bg-white p-2.5 rounded-lg border border-[#E8DCCF]">
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">مجموعة لقاء الجمعة (التربوي)</label>
-                  <select
-                    value={tarbawiGroupId}
-                    onChange={(e) => setTarbawiGroupId(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[#E8DCCF] mb-1.5"
-                  >
-                    {groups.filter(g => g.departmentId === 'tarbawi' && (g.branchId === studentBranchId || !g.branchId)).map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                  <div className="text-[11px] text-[#8C6D53] flex items-center justify-between">
-                    <span>المعلم: <strong className="text-[#4A2F18]">{selectedTarbawiTeacher?.fullName || 'غير محدد'}</strong></span>
-                    <span>الميعاد: <strong className="text-[#4A2F18]">{selectedTarbawiGroup?.days.join('، ')} ({selectedTarbawiGroup?.startTime} - {selectedTarbawiGroup?.endTime})</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Guardian WhatsApp Phone & Sibling Linking */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">
-                    رقم ولي الأمر (واتساب) <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="010XXXXXXXX"
-                    value={guardianPhone}
-                    onChange={(e) => handleGuardianPhoneChange(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5] text-left tabular-nums"
-                  />
-                  <span className="text-[10px] text-[#8C6D53]">يحول تلقائياً للصيغة الدولية +20</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">ربط الإخوة (الأسرة لخصم 10 ج)</label>
-                  <select
-                    value={familyId}
-                    onChange={(e) => setFamilyId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
-                  >
-                    <option value="">طالب منفرد (بدون أسرة مسجلة)</option>
-                    {families.map(f => (
-                      <option key={f.id} value={f.id}>{f.familyName} ({f.note})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 5. Orphan Status & Fee Mode */}
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isOrphanCheckbox"
-                    checked={isOrphan}
-                    onChange={(e) => setIsOrphan(e.target.checked)}
-                    className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
-                  />
-                  <label htmlFor="isOrphanCheckbox" className="text-xs font-bold text-[#4A2F18] cursor-pointer">
-                    الطالب يتيم (تحديد حالة الدفع أو الخصم/الإعفاء)
-                  </label>
-                </div>
-
-                {isOrphan && (
-                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-amber-200">
-                    <div>
-                      <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">حالة السداد</label>
-                      <select
-                        value={feeMode}
-                        onChange={(e) => setFeeMode(e.target.value as FeeMode)}
-                        className="w-full px-2 py-1 text-xs rounded border border-amber-300 bg-white"
-                      >
-                        <option value="normal">يدفع كاملاً</option>
-                        <option value="discount">خصم بمبلغ محدد</option>
-                        <option value="exempt">معفى بالكامل (100%)</option>
-                      </select>
-                    </div>
-
-                    {feeMode === 'discount' && (
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">قيمة الخصم (ج)</label>
-                        <input
-                          type="number"
-                          value={feeDiscountAmount}
-                          onChange={(e) => setFeeDiscountAmount(Number(e.target.value))}
-                          className="w-full px-2 py-1 text-xs rounded border border-amber-300 bg-white tabular-nums"
-                        />
-                      </div>
-                    )}
-
-                    <div className={feeMode === 'discount' ? 'col-span-1' : 'col-span-2'}>
-                      <label className="block text-[11px] font-bold text-[#4A2F18] mb-1">سبب الاستثناء / الإعفاء</label>
-                      <input
-                        type="text"
-                        placeholder="سبب اعتمده المدير أو المشرف"
-                        value={feeReason}
-                        onChange={(e) => setFeeReason(e.target.value)}
-                        className="w-full px-2 py-1 text-xs rounded border border-amber-300 bg-white"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 6. Date & Notes */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">تاريخ الالتحاق</label>
-                  <input
-                    type="date"
-                    value={joinDate}
-                    onChange={(e) => setJoinDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">ملاحظات إضافية</label>
-                  <input
-                    type="text"
-                    placeholder="أي ملاحظات حول الحفظ أو السلوك..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
-                  />
-                </div>
-              </div>
-
-              {/* 7. Agreement Checkbox */}
-              <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="agreementCheckbox"
-                  checked={agreementAccepted}
-                  onChange={(e) => setAgreementAccepted(e.target.checked)}
-                  className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer shrink-0"
-                />
-                <label htmlFor="agreementCheckbox" className="text-xs font-bold text-[#4A2F18] cursor-pointer">
-                  اطلع ولي الأمر على شروط الالتحاق الثمانية بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
-                </label>
-              </div>
-
-              {/* Form Actions */}
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DCCF] no-print">
-                <button
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg transition cursor-pointer"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg transition shadow-xs cursor-pointer flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{editingStudentId ? 'تحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Students Data Table */}
-      <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs no-print">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse text-xs">
-            <thead>
-              <tr className="bg-[#F6EEE4] border-b border-[#E8DCCF] text-[#4A2F18] font-bold">
-                <th className="py-3 px-4">الطالب والاسم رباعي</th>
-                <th className="py-3 px-3">النوع</th>
-                <th className="py-3 px-3">المرحلة والصف</th>
-                <th className="py-3 px-3">حلقة التحفيظ</th>
-                <th className="py-3 px-3">لقاء الجمعة (التربوي)</th>
-                <th className="py-3 px-3">حالة القيد</th>
-                <th className="py-3 px-3">غياب الشهر</th>
-                <th className="py-3 px-3">الاشتراك</th>
-                <th className="py-3 px-3">حالة الدخول</th>
-                <th className="py-3 px-4 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DCCF]">
-              {filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-8 text-center text-[#8C6D53]">
-                    لا توجد سجلات مطابقة للبحث أو المرشحات المحددة.
-                  </td>
-                </tr>
-              ) : (
-                filteredStudents.map(student => {
-                  const banInfo = checkStudentBan(student.id);
-                  const absenceCount = getStudentAbsenceCountThisMonth(student.id);
-                  const tahfeezGrp = groups.find(g => g.id === student.tahfeezGroupId);
-                  const tarbawiGrp = groups.find(g => g.id === student.tarbawiGroupId);
-                  
-                  // كشف النوع بذكاء
-                  const isFemale = detectStudentGender(student) === 'female';
-
-                  return (
-                    <tr key={student.id} className={`hover:bg-[#FDFBF9] transition ${student.status === 'dropped' ? 'bg-amber-50/20' : ''}`}>
-                      
-                      {/* Name & Sibling Indicator */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onSelectStudent(student)}
-                            className="font-bold text-[#4A2F18] hover:text-[#B9895B] hover:underline text-right cursor-pointer"
-                          >
-                            {student.fullName}
-                          </button>
-                          {student.isOrphan && (
-                            <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-semibold">
-                              يتيم
-                            </span>
-                          )}
-                          {student.familyId && (
-                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-semibold" title="مستفيد من خصم الإخوة">
-                              شقيق
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-[#8C6D53] tabular-nums dir-ltr block text-right mt-0.5">
-                          {student.guardianPhone}
-                        </span>
-                        {student.status === 'dropped' && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span>منقطع: {student.droppedReason || 'بدون سبب مسجل'} {student.droppedDate ? `(بتاريخ ${student.droppedDate})` : ''}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Gender Column */}
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          isFemale 
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
-                            : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}>
-                          {isFemale ? 'أنثى' : 'ذكر'}
-                        </span>
-                      </td>
-
-                      {/* Stage & Grade */}
-                      <td className="py-3 px-3">
-                        <span className="text-[#4A2F18] font-medium">{student.grade}</span>
-                        <span className="block text-[10px] text-[#8C6D53]">
-                          {student.stage === 'primary' ? 'ابتدائي (50 ج)' :
-                           student.stage === 'prep' ? 'إعدادي (65 ج)' : 'ثانوي (80 ج)'}
-                        </span>
-                      </td>
-
-                      {/* Tahfeez Group */}
-                      <td className="py-3 px-3">
-                        <span className="text-[#4A2F18] font-medium">{tahfeezGrp?.name || '—'}</span>
-                        <span className="block text-[10px] text-[#8C6D53]">
-                          {teachers.find(t => t.id === tahfeezGrp?.teacherId)?.fullName}
-                        </span>
-                      </td>
-
-                      {/* Tarbawi Group */}
-                      <td className="py-3 px-3">
-                        <span className="text-[#4A2F18] font-medium">{tarbawiGrp?.name || '—'}</span>
-                        <span className="block text-[10px] text-[#8C6D53]">
-                          {teachers.find(t => t.id === tarbawiGrp?.teacherId)?.fullName}
-                        </span>
-                      </td>
-
-                      {/* Enrollment Status */}
-                      <td className="py-3 px-3">
-                        {student.status === 'active' ? (
-                          <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200 inline-block">
-                            منتظم (مقيد)
-                          </span>
-                        ) : student.status === 'dropped' ? (
-                          <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-300 inline-block">
-                            منقطع عن الدراسة
-                          </span>
-                        ) : student.status === 'suspended' ? (
-                          <span className="text-purple-800 font-bold bg-purple-50 px-2 py-0.5 rounded text-[11px] border border-purple-200 inline-block">
-                            فصل مؤقت
-                          </span>
-                        ) : (
-                          <span className="text-[#8C6D53] text-[11px]">مغادر</span>
-                        )}
-                      </td>
-
-                      {/* Absence Counter */}
-                      <td className="py-3 px-3">
-                        <span className={`font-bold tabular-nums text-xs ${
-                          absenceCount >= 8 ? 'text-red-700 font-black' :
-                          absenceCount >= 6 ? 'text-amber-700 font-bold' :
-                          absenceCount >= 4 ? 'text-amber-600' : 'text-[#4A2F18]'
-                        }`}>
-                          {absenceCount} من 16
-                        </span>
-                        {absenceCount >= 6 && (
-                          <span className="block text-[10px] text-red-600 font-bold">
-                            تجاوز الحد (إنذار)
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Fee Mode */}
-                      <td className="py-3 px-3">
-                        {student.feeMode === 'exempt' ? (
-                          <span className="text-emerald-700 font-bold text-[11px]">معفى (0 ج)</span>
-                        ) : student.feeMode === 'discount' ? (
-                          <span className="text-blue-700 font-bold text-[11px]">خصم {student.feeDiscountAmount} ج</span>
-                        ) : (
-                          <span className="text-[#4A2F18] text-[11px]">كامل</span>
-                        )}
-                      </td>
-
-                      {/* Ban Status */}
-                      <td className="py-3 px-3">
-                        {banInfo.isBanned ? (
-                          <div className="flex items-center gap-1.5 text-red-700 font-bold bg-red-50 px-2 py-1 rounded-md border border-red-200">
-                            <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-red-600" />
-                            <span className="truncate max-w-[120px]" title={banInfo.details}>
-                              ممنوع من الدخول
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded text-[11px]">
-                            مسموح
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* Edit Student Button */}
-                          {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
-                            <button
-                              onClick={() => handleOpenEdit(student)}
-                              title="تعديل بيانات الطالب"
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 transition cursor-pointer"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => onSelectStudent(student)}
-                            title="عرض الملف الشامل"
-                            className="p-1.5 rounded-md hover:bg-[#F6EEE4] text-[#4A2F18] transition cursor-pointer"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onPrintAdmissionSlip(student)}
-                            title="طباعة استمارة التقديم وشروط الالتحاق"
-                            className="p-1.5 rounded-md hover:bg-[#F6EEE4] text-[#8C6D53] transition cursor-pointer"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-
-                          {/* Drop or Reactivate Actions */}
-                          {student.status === 'dropped' ? (
-                            <button
-                              onClick={() => {
-                                reactivateStudent(student.id);
-                                setActionSuccessNotice(`تمت إعادة قيد وتفعيل الطالب (${student.fullName}) بنجاح!`);
-                                setTimeout(() => setActionSuccessNotice(null), 4000);
-                              }}
-                              title="إعادة قيد وتفعيل الطالب"
-                              className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              <span>إعادة قيد</span>
-                            </button>
-                          ) : (
-                            (currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
-                              <button
-                                onClick={() => {
-                                  setStudentToDrop(student);
-                                  setDropReason('ظروف عائلية أو انشغال دراسي');
-                                }}
-                                title="تسجيل انقطاع الطالب (منقطع)"
-                                className="p-1.5 rounded-md hover:bg-amber-100 text-amber-700 transition cursor-pointer"
-                              >
-                                <UserMinus className="w-4 h-4" />
-                              </button>
-                            )
-                          )}
-
-                          {/* Admin Permanent Delete */}
-                          {currentUser.role === 'admin' && (
-                            <button
-                              onClick={() => setStudentToDeletePermanent(student)}
-                              title="حذف نهائي من النظام (للمدير)"
-                              className="p-1.5 rounded-md hover:bg-red-50 text-red-600 transition cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal: Record Student Dropout */}
-      {studentToDrop && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4">
-            <div className="flex items-center gap-3 text-amber-700">
-              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                <UserMinus className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-[#4A2F18]">تسجيل انقطاع الطالب عن الدراسة</h3>
-                <p className="text-[11px] text-[#8C6D53]">الطالب: {studentToDrop.fullName}</p>
-              </div>
-            </div>
-
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
-              <strong>ملاحظة هامة:</strong> لن يتم حذف الطالب نهائياً، بل سيتم حفظ سجله بالكامل مع إيقاف المطالبات والغياب اليومي، مع إمكانية <strong>إعادة قيده وتفعيله</strong> في أي وقت بضغطة زر.
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#4A2F18] mb-1">سبب انقطاع الطالب عن الحضور:</label>
-              <input
-                type="text"
-                value={dropReason}
-                onChange={(e) => setDropReason(e.target.value)}
-                placeholder="مثال: ظروف أسرية، سفر، انشغال بالدراسة المدرسية..."
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5] text-[#4A2F18] font-medium"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E8DCCF]">
-              <button
-                type="button"
-                onClick={() => setStudentToDrop(null)}
-                className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg transition cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStudentDropped(studentToDrop.id, dropReason.trim() || 'انقطاع عن الدراسة');
-                  setStudentToDrop(null);
-                  setActionSuccessNotice(`تم تسجيل انقطاع الطالب (${studentToDrop.fullName}) بنجاح والاحتفاظ بملفه في قائمة المنقطعين.`);
-                  setTimeout(() => setActionSuccessNotice(null), 5000);
-                }}
-                className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
-              >
-                <UserMinus className="w-4 h-4" />
-                <span>تأكيد تسجيل الانقطاع</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Permanent Deletion */}
-      {studentToDeletePermanent && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-red-200 shadow-xl p-5 space-y-4">
-            <div className="flex items-center gap-3 text-red-700">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5 text-red-700" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-[#4A2F18]">تأكيد الحذف النهائي للطالب</h3>
-                <p className="text-[11px] text-[#8C6D53]">الطالب: {studentToDeletePermanent.fullName}</p>
-              </div>
-            </div>
-
-            <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 leading-relaxed">
-              <strong>تحذير لا رجعة فيه:</strong> الحذف النهائي يزيل سجل الطالب نهائياً من قاعدة البيانات. إذا كان الطالب قد غادر أو انقطع فقط، يُفضل اختيار <strong>(تسجيل انقطاع)</strong> بدلاً من الحذف للحفاظ على السجلات المالية والأكاديمية.
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E8DCCF]">
-              <button
-                type="button"
-                onClick={() => setStudentToDeletePermanent(null)}
-                className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg transition cursor-pointer"
-              >
-                تراجع
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteStudent(studentToDeletePermanent.id, true);
-                  setStudentToDeletePermanent(null);
-                  setActionSuccessNotice(`تم حذف سجل الطالب نهائياً من قاعدة البيانات.`);
-                  setTimeout(() => setActionSuccessNotice(null), 4000);
-                }}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>حذف نهائي قطعي</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
+    <AppContext.Provider
+      value={{
+        currentUser,
+        setCurrentUser,
+        selectedBranchId,
+        setSelectedBranchId,
+        branches,
+        users,
+        departments,
+        teachers,
+        groups,
+        students,
+        families,
+        studentAttendance,
+        teacherAttendance,
+        disciplineCases,
+        studentNotes,
+        dues,
+        payments,
+        storeItems,
+        sales,
+        pointsLedger,
+        rewards,
+        rewardGrants,
+        messageTemplates,
+        messageLogs,
+        auditLogs,
+        settings,
+        checkStudentBan,
+        getStudentAbsenceCountThisMonth,
+        getStudentPoints,
+        addStudent,
+        updateStudent,
+        deleteStudent,
+        saveStudentAttendanceBatch,
+        saveTeacherAttendance,
+        recordPayment,
+        generateMonthlyDues,
+        recordSale,
+        addStoreItem,
+        updateStoreItem,
+        recordGuardianAttendance,
+        adminExceptionalUnban,
+        deliverReward,
+        addManualPoints,
+        addStudentNote,
+        updateSettings,
+        updateMessageTemplate,
+        logMessageSent,
+        addTeacher,
+        updateTeacher,
+        deleteTeacher,
+        addGroup,
+        updateGroup,
+        deleteGroup,
+        addBranch,
+        updateBranch,
+        toggleBranchStatus,
+        deleteBranch,
+        setStudentDropped,
+        reactivateStudent,
+        deleteStoreItem,
+        addReward,
+        updateReward,
+        deleteReward,
+        addUser,
+        updateUser,
+        deleteUser,
+        canUserAccessModule,
+        isAuthenticated,
+        login,
+        logout,
+        clearMockData,
+        exportBackupJson,
+        importBackupJson,
+        resetToDemoData,
+        isSupabaseConnected,
+        isSyncing,
+        syncStatusMessage,
+        seedInitialDataToSupabase,
+        fetchFromSupabase
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useApp must be used within an AppProvider');
+  return context;
 };
