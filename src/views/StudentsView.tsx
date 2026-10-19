@@ -12,7 +12,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   UserMinus,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -39,7 +40,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [genderFilter, setGenderFilter] = useState<string>('all'); // 👈 فلتر النوع
+  const [genderFilter, setGenderFilter] = useState<string>('all');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [bannedFilter, setBannedFilter] = useState<string>('all');
   const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -58,7 +59,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
   );
   const [fullName, setFullName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female'>('male'); // 👈 حالة النوع في الاستمارة
+  const [gender, setGender] = useState<'male' | 'female'>('male');
   const [stage, setStage] = useState<EducationalStage>('primary');
   const [grade, setGrade] = useState('الصف الرابع الابتدائي');
   const [tahfeezGroupId, setTahfeezGroupId] = useState(groups.find(g => g.departmentId === 'tahfeez')?.id || '');
@@ -79,7 +80,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     return students.filter(s => {
       if (selectedBranchId !== 'all' && s.branchId !== selectedBranchId) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
-      if (genderFilter !== 'all' && s.gender !== genderFilter) return false; // 👈 تطبيق فلتر النوع
+      if (genderFilter !== 'all' && s.gender !== genderFilter) return false;
       if (stageFilter !== 'all' && s.stage !== stageFilter) return false;
       if (groupFilter !== 'all' && s.tahfeezGroupId !== groupFilter && s.tarbawiGroupId !== groupFilter) return false;
       if (bannedFilter === 'banned') {
@@ -102,7 +103,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const selectedTarbawiGroup = groups.find(g => g.id === tarbawiGroupId);
   const selectedTarbawiTeacher = teachers.find(t => t.id === selectedTarbawiGroup?.teacherId);
 
-  // Auto-detect sibling family if guardian phone matches existing student
   const handleGuardianPhoneChange = (val: string) => {
     setGuardianPhone(val);
     const cleaned = val.replace(/\D/g, '').replace(/^0+/, '');
@@ -113,7 +113,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     }
   };
 
-  // Stage changes adjust default grade options
   const handleStageChange = (newStage: EducationalStage) => {
     setStage(newStage);
     if (newStage === 'primary') setGrade('الصف الرابع الابتدائي');
@@ -121,19 +120,16 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     else setGrade('الصف الأول الثانوي');
   };
 
-  // Submit Admission Form
   const handleSubmitStudent = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    // 1. Validate 4-part name
     const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
     if (nameParts.length < 4) {
       setFormError('الاسم رباعي إلزامي: يرجى كتابة الاسم الرباعي كاملاً (4 أجزاء على الأقل)');
       return;
     }
 
-    // 2. Validate guardian phone
     const cleaned = guardianPhone.replace(/\D/g, '');
     if (cleaned.length < 10) {
       setFormError('يرجى إدخال رقم هاتف ولي الأمر صحيحاً');
@@ -146,16 +142,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       finalPhone = '20' + finalPhone;
     }
 
-    // 3. Agreement confirmation check
     if (!agreementAccepted) {
       setFormError('يجب تأكيد اطلاع ولي الأمر على شروط الالتحاق والموافقة عليها');
       return;
     }
 
     const newStudent = addStudent({
-      branchId: studentBranchId, // 👈 إسناد الفرع المقتطَع من اختيار الاستمارة
+      branchId: studentBranchId,
       fullName: fullName.trim(),
-      gender, // 👈 إرسال النوع أثناء حفظ الطالب
+      gender,
       grade,
       stage,
       guardianPhone: finalPhone,
@@ -173,9 +168,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       tarbawiGroupId
     });
 
-    // Reset and close
     setFullName('');
-    setGender('male'); // 👈 إعادة تعيين النوع
+    setGender('male');
     setGuardianPhone('');
     setIsOrphan(false);
     setFeeDiscountAmount(0);
@@ -185,11 +179,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     setAgreementAccepted(false);
     setIsFormOpen(false);
 
-    // Prompt to print admission slip
     onPrintAdmissionSlip(newStudent);
   };
 
-  // Export CSV
   const handleExportCSV = () => {
     const headers = ['المعرف', 'الاسم رباعي', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
     const rows = filteredStudents.map(s => [
@@ -215,10 +207,33 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   };
 
   return (
-    <div className="space-y-6">
-      
+    <div className="space-[#space-y-6] space-y-6">
+      {/* تضمين تنسيقات حماية الطباعة لتفادي قطع أعلى الاستمارة */}
+      <style>{`
+        @media print {
+          body, html {
+            height: auto !important;
+            overflow: visible !important;
+            background: #fff !important;
+          }
+          .printable-admission-modal {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            padding-top: 12mm !important;
+            margin: 0 !important;
+            overflow: visible !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Header Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#FFFFFF] p-4 rounded-xl border border-[#E8DCCF] shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#FFFFFF] p-4 rounded-xl border border-[#E8DCCF] shadow-2xs no-print">
         <div>
           <h2 className="text-base font-bold text-[#4A2F18]">شؤون الطلاب واستمارة القيد والتسجيل</h2>
           <p className="text-xs text-[#8C6D53]">
@@ -251,7 +266,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF]">
+      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF] no-print">
         <div className="relative sm:col-span-1">
           <Search className="w-4 h-4 absolute right-3 top-2.5 text-[#8C6D53]" />
           <input
@@ -276,7 +291,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
           </select>
         </div>
 
-        {/* 👈 فلتر النوع الجديد */}
         <div>
           <select
             value={genderFilter}
@@ -328,7 +342,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       </div>
 
       {actionSuccessNotice && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2">
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2 no-print">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           <span>{actionSuccessNotice}</span>
         </div>
@@ -336,25 +350,28 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
       {/* Admission Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-8">
-            <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-6 md:pt-10 overflow-y-auto printable-admission-modal">
+          <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto max-h-[90vh] flex flex-col print:max-h-none print:shadow-none print:border-none">
+            
+            {/* Modal Header */}
+            <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0 no-print">
               <div>
                 <h3 className="text-sm font-bold">استمارة تقديم وقيد طالب جديد</h3>
                 <p className="text-[11px] text-[#D8C3AE]">التحاق بالمدرسة القرآنية ولقاء الجمعة التربوي</p>
               </div>
               <button 
                 onClick={() => setIsFormOpen(false)}
-                className="text-white hover:text-red-200 text-lg font-bold px-2 cursor-pointer"
+                className="text-white hover:text-red-200 p-1 rounded-lg transition cursor-pointer"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitStudent} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            {/* Modal Form Body */}
+            <form onSubmit={handleSubmitStudent} className="p-6 space-y-4 overflow-y-auto flex-1 print:overflow-visible print:p-0">
               
               {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-bold text-red-700 flex items-center gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-bold text-red-700 flex items-center gap-2 no-print">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{formError}</span>
                 </div>
@@ -391,7 +408,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 />
               </div>
 
-              {/* 👈 1.1 اختيار النوع (الجنس) بدون إيموجي */}
+              {/* 1.1 Gender Selection */}
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">
                   النوع (الجنس) <span className="text-red-600">*</span>
@@ -612,7 +629,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   id="agreementCheckbox"
                   checked={agreementAccepted}
                   onChange={(e) => setAgreementAccepted(e.target.checked)}
-                  className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer"
+                  className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer shrink-0"
                 />
                 <label htmlFor="agreementCheckbox" className="text-xs font-bold text-[#4A2F18] cursor-pointer">
                   اطلع ولي الأمر على شروط الالتحاق الثمانية بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
@@ -620,7 +637,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
               </div>
 
               {/* Form Actions */}
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DCCF]">
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DCCF] no-print">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
@@ -643,13 +660,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       )}
 
       {/* Students Data Table */}
-      <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs">
+      <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs no-print">
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse text-xs">
             <thead>
               <tr className="bg-[#F6EEE4] border-b border-[#E8DCCF] text-[#4A2F18] font-bold">
                 <th className="py-3 px-4">الطالب والاسم رباعي</th>
-                <th className="py-3 px-3">النوع</th> {/* 👈 عمود النوع */}
+                <th className="py-3 px-3">النوع</th>
                 <th className="py-3 px-3">المرحلة والصف</th>
                 <th className="py-3 px-3">حلقة التحفيظ</th>
                 <th className="py-3 px-3">لقاء الجمعة (التربوي)</th>
@@ -877,7 +894,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
       {/* Modal: Record Student Dropout */}
       {studentToDrop && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4">
             <div className="flex items-center gap-3 text-amber-700">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
@@ -932,7 +949,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
       {/* Modal: Permanent Deletion */}
       {studentToDeletePermanent && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl max-w-md w-full border border-red-200 shadow-xl p-5 space-y-4">
             <div className="flex items-center gap-3 text-red-700">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
