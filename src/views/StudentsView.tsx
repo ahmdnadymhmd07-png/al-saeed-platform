@@ -13,7 +13,8 @@ import {
   AlertCircle,
   UserMinus,
   RefreshCw,
-  X
+  X,
+  Edit3
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -30,6 +31,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     families, 
     selectedBranchId, 
     addStudent, 
+    updateStudent,
     deleteStudent, 
     setStudentDropped,
     reactivateStudent,
@@ -39,6 +41,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   } = useApp();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [stageFilter, setStageFilter] = useState<string>('all');
@@ -120,6 +124,49 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     else setGrade('الصف الأول الثانوي');
   };
 
+  const resetFormFields = () => {
+    setEditingStudentId(null);
+    setFullName('');
+    setGender('male');
+    setGuardianPhone('');
+    setIsOrphan(false);
+    setFeeMode('normal');
+    setFeeDiscountAmount(0);
+    setFeeReason('');
+    setFamilyId('');
+    setNotes('');
+    setAgreementAccepted(false);
+    setFormError(null);
+  };
+
+  const handleOpenAddNew = () => {
+    resetFormFields();
+    setStudentBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEdit = (student: Student) => {
+    setEditingStudentId(student.id);
+    setStudentBranchId(student.branchId);
+    setFullName(student.fullName);
+    setGender(student.gender || 'male');
+    setStage(student.stage);
+    setGrade(student.grade);
+    setTahfeezGroupId(student.tahfeezGroupId || '');
+    setTarbawiGroupId(student.tarbawiGroupId || '');
+    setGuardianPhone(student.guardianPhone);
+    setIsOrphan(student.isOrphan || false);
+    setFeeMode(student.feeMode || 'normal');
+    setFeeDiscountAmount(student.feeDiscountAmount || 0);
+    setFeeReason(student.feeReason || '');
+    setFamilyId(student.familyId || '');
+    setJoinDate(student.joinDate || new Date().toISOString().slice(0, 10));
+    setNotes(student.notes || '');
+    setAgreementAccepted(true);
+    setFormError(null);
+    setIsFormOpen(true);
+  };
+
   const handleSubmitStudent = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -147,7 +194,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       return;
     }
 
-    const newStudent = addStudent({
+    const studentData = {
       branchId: studentBranchId,
       fullName: fullName.trim(),
       gender,
@@ -161,25 +208,25 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       familyId: familyId || undefined,
       joinDate,
       notes: notes.trim(),
-      status: 'active',
+      status: 'active' as const,
       agreementAccepted: true,
       agreementDate: joinDate,
       tahfeezGroupId,
       tarbawiGroupId
-    });
+    };
 
-    setFullName('');
-    setGender('male');
-    setGuardianPhone('');
-    setIsOrphan(false);
-    setFeeDiscountAmount(0);
-    setFeeReason('');
-    setFamilyId('');
-    setNotes('');
-    setAgreementAccepted(false);
-    setIsFormOpen(false);
-
-    onPrintAdmissionSlip(newStudent);
+    if (editingStudentId) {
+      updateStudent(editingStudentId, studentData);
+      setActionSuccessNotice(`تم تعديل بيانات الطالب (${fullName.trim()}) بنجاح!`);
+      setTimeout(() => setActionSuccessNotice(null), 4000);
+      setIsFormOpen(false);
+      resetFormFields();
+    } else {
+      const newStudent = addStudent(studentData);
+      setIsFormOpen(false);
+      resetFormFields();
+      onPrintAdmissionSlip(newStudent);
+    }
   };
 
   const handleExportCSV = () => {
@@ -207,8 +254,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   };
 
   return (
-    <div className="space-[#space-y-6] space-y-6">
-      {/* تضمين تنسيقات حماية الطباعة لتفادي قطع أعلى الاستمارة */}
+    <div className="space-y-6">
       <style>{`
         @media print {
           body, html {
@@ -237,7 +283,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         <div>
           <h2 className="text-base font-bold text-[#4A2F18]">شؤون الطلاب واستمارة القيد والتسجيل</h2>
           <p className="text-xs text-[#8C6D53]">
-            تسجيل الطلاب الجدد، ربط الإخوة، ضبط إعفاءات الأيتام، ومتابعة حالات المنع من الدخول
+            تسجيل الطلاب الجدد، تعديل البيانات، ربط الإخوة، ضبط إعفاءات الأيتام، ومتابعة حالات المنع من الدخول
           </p>
         </div>
 
@@ -252,10 +298,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
           
           {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
             <button
-              onClick={() => {
-                setStudentBranchId(selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1');
-                setIsFormOpen(true);
-              }}
+              onClick={handleOpenAddNew}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-[#4A2F18] hover:bg-[#382312] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <UserPlus className="w-4 h-4 text-[#D8C3AE]" />
@@ -348,7 +391,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       )}
 
-      {/* Admission Form Modal */}
+      {/* Admission / Edit Student Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-6 md:pt-10 overflow-y-auto printable-admission-modal">
           <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto max-h-[90vh] flex flex-col print:max-h-none print:shadow-none print:border-none">
@@ -356,7 +399,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             {/* Modal Header */}
             <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0 no-print">
               <div>
-                <h3 className="text-sm font-bold">استمارة تقديم وقيد طالب جديد</h3>
+                <h3 className="text-sm font-bold">
+                  {editingStudentId ? 'تعديل بيانات الطالب المسجل' : 'استمارة تقديم وقيد طالب جديد'}
+                </h3>
                 <p className="text-[11px] text-[#D8C3AE]">التحاق بالمدرسة القرآنية ولقاء الجمعة التربوي</p>
               </div>
               <button 
@@ -650,7 +695,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg transition shadow-xs cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>حفظ الطالب وطباعة الاستمارة</span>
+                  <span>{editingStudentId ? 'تحديث وتحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
                 </button>
               </div>
 
@@ -826,6 +871,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {/* Edit Student Button */}
+                          {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
+                            <button
+                              onClick={() => handleOpenEdit(student)}
+                              title="تعديل بيانات الطالب"
+                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 transition cursor-pointer"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => onSelectStudent(student)}
                             title="عرض الملف الشامل"
