@@ -171,6 +171,7 @@ export const mappers = {
       id: s.id,
       branch_id: s.branchId,
       full_name: s.fullName,
+      gender: s.gender || 'male',
       grade: s.grade,
       stage: s.stage,
       guardian_phone: s.guardianPhone,
@@ -189,30 +190,57 @@ export const mappers = {
       tarbawi_group_id: s.tarbawiGroupId,
       notes: s.notes || null
     }),
-    fromDb: (r: any): Student => ({
-      id: r.id,
-      branchId: r.branch_id || 'b1',
-      fullName: r.full_name,
-      grade: r.grade || 'الصف الأول الابتدائي',
-      stage: r.stage || 'primary',
-      guardianPhone: r.guardian_phone || '',
-      isOrphan: Boolean(r.is_orphan),
-      feeMode: r.fee_mode || 'normal',
-      feeDiscountAmount: Number(r.fee_discount_amount) || 0,
-      feeReason: r.fee_reason || undefined,
-      familyId: r.family_id || undefined,
-      joinDate: r.join_date || '',
-      status: r.status || 'active',
-      droppedReason: r.dropped_reason || undefined,
-      droppedDate: r.dropped_date || undefined,
-      agreementAccepted: Boolean(r.agreement_accepted),
-      agreementDate: r.agreement_date || '',
-      tahfeezGroupId: r.tahfeez_group_id || 'g1',
-      tarbawiGroupId: r.tarbawi_group_id || 'g5',
-      notes: r.notes || undefined,
-      createdAt: r.created_at || new Date().toISOString(),
-      updatedAt: r.updated_at || new Date().toISOString()
-    })
+    fromDb: (r: any): Student => {
+      // 🧠 تنظيف القيمة القادمة من Supabase من أي علامات تنصيص زائدة مثل "'male'"
+      const rawGender = String(r.gender || '').replace(/['"]/g, '').trim().toLowerCase();
+      
+      let cleanGender: 'male' | 'female' = 'male';
+      if (rawGender === 'female' || rawGender === 'أنثى' || rawGender === 'أنثي') {
+        cleanGender = 'female';
+      } else if (rawGender === 'male' || rawGender === 'ذكر') {
+        cleanGender = 'male';
+      } else {
+        // فحص الاسم في حالة كانت القيمة فارغة في قاعدة البيانات
+        const cleanName = String(r.full_name || r.fullName || '').trim().replace(/[\u064B-\u0652]/g, '');
+        const firstName = cleanName.split(/\s+/)[0] || '';
+        const femaleNames = new Set([
+          'أمل', 'مودة', 'مي', 'ندى', 'منى', 'رضوى', 'هبة', 'شهد', 'جنى', 'ملك', 'نور',
+          'مريم', 'فاطمة', 'عائشة', 'خديجة', 'زينب', 'رقية', 'أم كلثوم', 'أسماء', 'هاجر',
+          'سارة', 'شيماء', 'إيمان', 'آية', 'آيات', 'ملاك', 'روان', 'ريناد', 'فريدة', 'منة',
+          'بسملة', 'تسنيم', 'رحمة', 'حبيبة', 'سلمى', 'سمية', 'جويرية', 'ياسمين', 'إسراء'
+        ]);
+
+        if (femaleNames.has(firstName) || (firstName.endsWith('ة') && !['حمزة', 'طلحة', 'عبيدة'].includes(firstName))) {
+          cleanGender = 'female';
+        }
+      }
+
+      return {
+        id: r.id,
+        branchId: r.branch_id || 'b1',
+        fullName: r.full_name || '',
+        gender: cleanGender,
+        grade: r.grade || 'الصف الأول الابتدائي',
+        stage: r.stage || 'primary',
+        guardianPhone: r.guardian_phone || '',
+        isOrphan: Boolean(r.is_orphan),
+        feeMode: r.fee_mode || 'normal',
+        feeDiscountAmount: Number(r.fee_discount_amount) || 0,
+        feeReason: r.fee_reason || undefined,
+        familyId: r.family_id || undefined,
+        joinDate: r.join_date || '',
+        status: r.status || 'active',
+        droppedReason: r.dropped_reason || undefined,
+        droppedDate: r.dropped_date || undefined,
+        agreementAccepted: Boolean(r.agreement_accepted),
+        agreementDate: r.agreement_date || '',
+        tahfeezGroupId: r.tahfeez_group_id || 'g1',
+        tarbawiGroupId: r.tarbawi_group_id || 'g5',
+        notes: r.notes || undefined,
+        createdAt: r.created_at || new Date().toISOString(),
+        updatedAt: r.updated_at || new Date().toISOString()
+      };
+    }
   },
 
   studentAttendance: {
