@@ -695,7 +695,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg transition shadow-xs cursor-pointer flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{editingStudentId ? 'تحديث وتحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
+                  <span>{editingStudentId ? 'تحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
                 </button>
               </div>
 
@@ -773,11 +773,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                       {/* Gender Column */}
                       <td className="py-3 px-3">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          student.gender === 'female' 
+                          (student.gender === 'female' || student.gender === 'أنثى')
                             ? 'bg-rose-50 text-rose-700 border border-rose-200' 
                             : 'bg-blue-50 text-blue-700 border border-blue-200'
                         }`}>
-                          {student.gender === 'female' ? 'أنثى' : 'ذكر'}
+                          {(student.gender === 'female' || student.gender === 'أنثى') ? 'أنثى' : 'ذكر'}
                         </span>
                       </td>
 
