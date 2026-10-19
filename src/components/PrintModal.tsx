@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Student, Payment } from '../types';
-import { Printer } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 
 interface PrintModalProps {
   type: 'admission' | 'receipt' | 'gatekeeper' | null;
@@ -33,11 +33,34 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
   const isFemale = student?.gender === 'female';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto pt-4 sm:pt-8 print:p-0 print:bg-white print:static print:overflow-visible">
+      
+      {/* CSS مخصص للطباعة يضمن إلغاء أي قطع علوي نهائياً */}
+      <style>{`
+        @media print {
+          body, html {
+            height: auto !important;
+            overflow: visible !important;
+            background: #fff !important;
+          }
+          .print-modal-container {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden my-auto print-modal-container">
         
         {/* Modal Controls (hidden during print) */}
-        <div className="no-print bg-[#4A2F18] p-4 text-white flex items-center justify-between">
+        <div className="no-print bg-[#4A2F18] p-4 text-white flex items-center justify-between sticky top-0 z-10 shadow-md">
           <div className="flex items-center gap-2">
             <Printer className="w-4 h-4 text-[#D8C3AE]" />
             <h3 className="text-xs font-bold">معاينة المستند الرسمي للطباعة</h3>
@@ -45,30 +68,34 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-[#B9895B] hover:bg-[#A37549] text-white rounded-lg text-xs font-bold transition cursor-pointer"
+              className="px-4 py-1.5 bg-[#B9895B] hover:bg-[#A37549] text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
-              طباعة المستند الآن (Print)
+              <Printer className="w-3.5 h-3.5" />
+              <span>طباعة المستند الآن</span>
             </button>
-            <button onClick={onClose} className="text-white hover:text-red-200 text-lg font-bold px-2 cursor-pointer">
-              ✕
+            <button 
+              onClick={onClose} 
+              className="text-white hover:text-red-200 p-1 rounded-lg transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Printable Paper A4 Layout */}
-        <div className="p-8 sm:p-10 text-xs text-[#2C1810] space-y-6">
+        <div className="p-6 sm:p-10 text-xs text-[#2C1810] space-y-6 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-4">
           
           {/* Header */}
-          <div className="border-b-2 border-[#4A2F18] pb-4 flex items-center justify-between">
+          <div className="border-b-2 border-[#4A2F18] pb-4 flex items-center justify-between pt-1">
             <div>
-              <h1 className="text-base font-black text-[#4A2F18]">{settings.associationName}</h1>
-              <h2 className="text-sm font-extrabold text-[#B9895B] mt-0.5">{settings.schoolName}</h2>
+              <h1 className="text-base sm:text-lg font-black text-[#4A2F18]">{settings.associationName}</h1>
+              <h2 className="text-xs sm:text-sm font-extrabold text-[#B9895B] mt-0.5">{settings.schoolName}</h2>
               <h3 className="text-xs font-bold text-[#8C6D53] mt-0.5">{currentBranch?.name}</h3>
             </div>
             <img 
               src={settings.logoUrl || '/school_logo.jpg'} 
               alt="شعار المدرسة" 
-              className="w-14 h-14 rounded-full object-cover border border-[#B9895B]/40"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-[#B9895B]/40 shrink-0"
               referrerPolicy="no-referrer"
               onError={(e) => { e.currentTarget.src = '/school_logo.jpg'; }}
             />
@@ -96,12 +123,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
               </div>
 
               {/* التعهد والإقرار مع ضبط التذكير والتأنيث */}
-              <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] text-[11px] leading-relaxed space-y-1">
+              <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] text-[11px] leading-relaxed space-y-1.5">
                 <span className="font-bold text-[#4A2F18] block text-xs">إقرار وتعهد ولي الأمر:</span>
                 <p>
                   أقر أنا ولي أمر {isFemale ? 'الطالبة المذكورة' : 'الطالب المذكور'} أعلاه باطلاعي على شروط ولوائح مدرسة السعيد القرآنية المعتمدة، وأتعهد بالآتي:
                 </p>
-                <ol className="list-decimal list-inside space-y-0.5 text-[#6D4C3D] pr-2">
+                <ol className="list-decimal list-inside space-y-1 text-[#6D4C3D] pr-2">
                   <li>الالتزام بحضور قسمي التحفيظ ولقاء الجمعة التربوي بانتظام.</li>
                   <li>عدم الغياب إلا لعذر قهري مثبت بإفادة خطية لمشرفة الغياب.</li>
                   <li>الالتزام التام باللائحة: (6 غيابات توجب الاستدعاء والمنع • 8 غيابات توجب الغرامة • 10 غيابات توجب الفصل لشهرين).</li>
@@ -113,15 +140,15 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
               <div className="pt-6 border-t border-[#4A2F18] flex items-center justify-between text-xs">
                 <div className="text-center">
                   <span>توقيع ولي الأمر</span>
-                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-32 mt-2" />
+                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-28 sm:w-32 mt-2" />
                 </div>
                 <div className="text-center">
                   <span>توقيع مسؤول التسجيل</span>
-                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-32 mt-2" />
+                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-28 sm:w-32 mt-2" />
                 </div>
                 <div className="text-center">
                   <span>خاتم المدرسة واعتماد الإدارة</span>
-                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-32 mt-2" />
+                  <div className="h-10 border-b border-dotted border-[#8C6D53] w-28 sm:w-32 mt-2" />
                 </div>
               </div>
             </div>
