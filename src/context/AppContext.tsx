@@ -56,7 +56,8 @@ import {
   fetchTable,
   upsertRecord,
   insertBatch,
-  deleteRecord
+  deleteRecord,
+  processOfflineQueue
 } from '../lib/supabaseSync';
 
 const normalizeStudent = (s: any): Student => {
@@ -389,6 +390,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsSyncing(true);
     setSyncStatusMessage('جارٍ فحص وتحميل البيانات من Supabase...');
     try {
+      // 🔄 محاولة تفريغ أي عمليات معلقة محلياً أولاً فور الفحص
+      await processOfflineQueue();
+
       const conn = await testSupabaseConnection();
       setIsSupabaseConnected(conn.success);
       if (!conn.success) {
