@@ -25,6 +25,12 @@ import {
 } from '../types';
 import { OFFICIAL_SCHOOL_LOGO } from '../data/initialData';
 
+// 💡 دالة معالجة التواريخ (تم رفعها في الأعلى لمنع خطأ الاستدعاء المبكر)
+function sDate(d: any): string {
+  if (!d) return new Date().toISOString().slice(0, 10);
+  return String(d).slice(0, 10);
+}
+
 // =========================================================================
 // Mappers: App Types <-> Supabase Database Records
 // =========================================================================
@@ -179,7 +185,7 @@ export const mappers = {
       fee_mode: s.feeMode,
       fee_discount_amount: s.feeDiscountAmount,
       fee_reason: s.feeReason || null,
-      family_id: s.familyId || null,
+      family_id: (s.familyId && s.familyId.length > 5 && !s.familyId.startsWith('s')) ? s.familyId : null,
       join_date: s.joinDate,
       status: s.status,
       dropped_reason: s.droppedReason || null,
@@ -191,7 +197,6 @@ export const mappers = {
       notes: s.notes || null
     }),
     fromDb: (r: any): Student => {
-      // 🧠 تنظيف القيمة القادمة من Supabase من أي علامات تنصيص زائدة مثل "'male'"
       const rawGender = String(r.gender || '').replace(/['"]/g, '').trim().toLowerCase();
       
       let cleanGender: 'male' | 'female' = 'male';
@@ -200,7 +205,6 @@ export const mappers = {
       } else if (rawGender === 'male' || rawGender === 'ذكر') {
         cleanGender = 'male';
       } else {
-        // فحص الاسم في حالة كانت القيمة فارغة في قاعدة البيانات
         const cleanName = String(r.full_name || r.fullName || '').trim().replace(/[\u064B-\u0652]/g, '');
         const firstName = cleanName.split(/\s+/)[0] || '';
         const femaleNames = new Set([
@@ -657,11 +661,6 @@ export const mappers = {
   }
 };
 
-function sDate(d: any): string {
-  if (!d) return new Date().toISOString().slice(0, 10);
-  return String(d).slice(0, 10);
-}
-
 /**
  * Fetch all records from a Supabase table with mapping
  */
@@ -673,7 +672,7 @@ export async function fetchTable<T>(
   try {
     const { data, error } = await supabase.from(tableName).select('*');
     if (error) {
-      console.warn(`[Supabase] Note on table "${tableName}": ${error.message}. Using fallback data.`);
+      console.warn(`[Supabase] Error fetching "${tableName}": ${error.message}`);
       return fallback;
     }
     if (data && data.length > 0) {
@@ -687,18 +686,20 @@ export async function fetchTable<T>(
 }
 
 /**
- * Upsert single record to Supabase
+ * Upsert single record to Supabase (مع إظهار الأخطاء صراحة)
  */
 export async function upsertRecord(tableName: string, record: any): Promise<boolean> {
   try {
     const { error } = await supabase.from(tableName).upsert(record);
     if (error) {
-      console.warn(`[Supabase] Upsert warning on "${tableName}":`, error.message);
+      console.error(`[Supabase Error] فشل الحفظ في "${tableName}":`, error.message);
+      alert(`خطأ من Supabase أثناء الحفظ في جدول (${tableName}):\n${error.message}`);
       return false;
     }
+    console.log(`[Supabase Success] تم الحفظ بنجاح في "${tableName}"`);
     return true;
-  } catch (err) {
-    console.error(`[Supabase] Upsert exception on "${tableName}":`, err);
+  } catch (err: any) {
+    console.error(`[Supabase Exception] "${tableName}":`, err);
     return false;
   }
 }
@@ -711,12 +712,12 @@ export async function insertBatch(tableName: string, records: any[]): Promise<bo
   try {
     const { error } = await supabase.from(tableName).upsert(records);
     if (error) {
-      console.warn(`[Supabase] Batch upsert warning on "${tableName}":`, error.message);
+      console.error(`[Supabase Error] فشل الدُفعة في "${tableName}":`, error.message);
       return false;
     }
     return true;
-  } catch (err) {
-    console.error(`[Supabase] Batch upsert exception on "${tableName}":`, err);
+  } catch (err: any) {
+    console.error(`[Supabase Exception] Batch "${tableName}":`, err);
     return false;
   }
 }
@@ -728,12 +729,12 @@ export async function deleteRecord(tableName: string, id: string): Promise<boole
   try {
     const { error } = await supabase.from(tableName).delete().eq('id', id);
     if (error) {
-      console.warn(`[Supabase] Delete warning on "${tableName}":`, error.message);
+      console.error(`[Supabase Error] فشل الحذف من "${tableName}":`, error.message);
       return false;
     }
     return true;
-  } catch (err) {
-    console.error(`[Supabase] Delete exception on "${tableName}":`, err);
+  } catch (err: any) {
+    console.error(`[Supabase Exception] Delete "${tableName}":`, err);
     return false;
   }
 }
