@@ -615,80 +615,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  // 🚀 دالة إضافة الطالب المحسنة والمضمونة لربط العائلات في Supabase
-  // 🚀 دالة إضافة الطالب مع معالجة حاسمة لربط العائلات في Supabase
-const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> => {
-  let finalFamilyId: string | undefined = undefined;
+  // 🚀 دالة إضافة الطالب المتزامنة والمثالية لرفع وتأكيد ربط العائلات في Supabase
+  const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> => {
+    let finalFamilyId: string | undefined = undefined;
 
-  try {
-    // 1️⃣ إذا اختار المستخدم ربط شقيق/عائلة
-    if (studentData.familyId && studentData.familyId.trim() !== '') {
-      const selectedId = studentData.familyId.trim();
-      
-      const existingFamily = families.find(f => f.id === selectedId);
-      const siblingStudent = students.find(s => s.id === selectedId || s.familyId === selectedId);
+    try {
+      // 1️⃣ إذا اختار المستخدم ربط شقيق/عائلة
+      if (studentData.familyId && studentData.familyId.trim() !== '') {
+        const selectedId = studentData.familyId.trim();
+        
+        const existingFamily = families.find(f => f.id === selectedId);
+        const siblingStudent = students.find(s => s.id === selectedId || s.familyId === selectedId);
 
-      if (existingFamily) {
-        finalFamilyId = existingFamily.id;
-        await upsertRecord('families', mappers.family.toDb(existingFamily));
-      } else if (siblingStudent) {
-        // إذا كان الشقيق مرتبطاً بعائلة من قبل، نأخذ معرف عائلته
-        if (siblingStudent.familyId && siblingStudent.familyId.startsWith('fam_')) {
-          finalFamilyId = siblingStudent.familyId;
-        } else {
-          // إنشاء سجل عائلة جديد يجمع الشقيقين
-          finalFamilyId = 'fam_' + Date.now();
-          const nameParts = siblingStudent.fullName.trim().split(/\s+/);
-          const fatherName = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : siblingStudent.fullName;
-          
-          const newFamilyObj: Family = {
-            id: finalFamilyId,
-            familyName: `عائلة ${fatherName}`,
-            guardianPhone: studentData.guardianPhone,
-            note: 'ربط إخوة تلقائي'
-          };
+        if (existingFamily) {
+          finalFamilyId = existingFamily.id;
+          await upsertRecord('families', mappers.family.toDb(existingFamily));
+        } else if (siblingStudent) {
+          // إذا كان الشقيق مرتبطاً بعائلة من قبل، نأخذ معرف عائلته
+          if (siblingStudent.familyId && siblingStudent.familyId.startsWith('fam_')) {
+            finalFamilyId = siblingStudent.familyId;
+          } else {
+            // إنشاء سجل عائلة جديد يجمع الشقيقين
+            finalFamilyId = 'fam_' + Date.now();
+            const nameParts = siblingStudent.fullName.trim().split(/\s+/);
+            const fatherName = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : siblingStudent.fullName;
+            
+            const newFamilyObj: Family = {
+              id: finalFamilyId,
+              familyName: `عائلة ${fatherName}`,
+              guardianPhone: studentData.guardianPhone,
+              note: 'ربط إخوة تلقائي'
+            };
 
-          // ⚠️ حفظ العائلة في Supabase أولاً
-          const famSaved = await upsertRecord('families', mappers.family.toDb(newFamilyObj));
+            // ⚠️ 1. حفظ العائلة الجديدة في Supabase أولاً بشكل متزامن
+            const famSaved = await upsertRecord('families', mappers.family.toDb(newFamilyObj));
 
-          if (famSaved) {
-            setFamilies(prev => [...prev, newFamilyObj]);
-            // تحديث الطالب الشقيق ليرتبط بالعائلة الجديدة
-            const updatedSibling = { ...siblingStudent, familyId: finalFamilyId };
-            setStudents(prev => prev.map(s => s.id === siblingStudent.id ? updatedSibling : s));
-            await upsertRecord('students', mappers.student.toDb(updatedSibling));
+            if (famSaved) {
+              setFamilies(prev => [...prev, newFamilyObj]);
+
+              // ⚠️ 2. إنشاء كائن الشقيق المحدث بصريح العبارة ورفعه فوراً بدون الاعتماد على تأخير الـ State
+              const updatedSiblingObj: Student = {
+                ...siblingStudent,
+                familyId: finalFamilyId,
+                updatedAt: new Date().toISOString()
+              };
+
+              // تحديث الـ State المحلي للشقيق
+              setStudents(prev => prev.map(s => s.id === siblingStudent.id ? updatedSiblingObj : s));
+
+              // رفع الشقيق بالقيم الجديدة مباشرة إلى Supabase
+              await upsertRecord('students', mappers.student.toDb(updatedSiblingObj));
+            }
           }
+        } else if (selectedId.startsWith('fam_')) {
+          finalFamilyId = selectedId;
         }
-      } else if (selectedId.startsWith('fam_')) {
-        finalFamilyId = selectedId;
       }
+
+      // 2️⃣ إنشاء كائن الطالب وتمرير finalFamilyId
+      const newStudentId = 's' + Date.now();
+      const newStudent: Student = normalizeStudent({
+        ...studentData,
+        familyId: finalFamilyId,
+        id: newStudentId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // 3️⃣ حفظ الطالب الجديد في Supabase
+      const studentSaved = await upsertRecord('students', mappers.student.toDb(newStudent));
+
+      if (studentSaved) {
+        setStudents(prev => [newStudent, ...prev]);
+        addAuditLog('إضافة طالب', `تسجيل الطالب ${studentData.fullName} وربطه بالعائلة بنجاح`);
+      }
+
+      return newStudent;
+    } catch (err: any) {
+      console.error('خطأ أثناء إضافة الطالب:', err);
+      alert('حدث خطأ أثناء حفظ البيانات: ' + (err?.message || 'خطأ غير معروف'));
+      throw err;
     }
-
-    // 2️⃣ إنشاء كائن الطالب وتمرير finalFamilyId
-    const newStudentId = 's' + Date.now();
-    const newStudent: Student = normalizeStudent({
-      ...studentData,
-      familyId: finalFamilyId,
-      id: newStudentId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-
-    // 3️⃣ حفظ الطالب في Supabase
-    const studentSaved = await upsertRecord('students', mappers.student.toDb(newStudent));
-
-    if (studentSaved) {
-      setStudents(prev => [newStudent, ...prev]);
-      addAuditLog('إضافة طالب', `تسجيل الطالب ${studentData.fullName} بنجاح`);
-    }
-
-    return newStudent;
-  } catch (err: any) {
-    console.error('خطأ أثناء إضافة الطالب:', err);
-    alert('حدث خطأ أثناء حفظ البيانات: ' + (err?.message || 'خطأ غير معروف'));
-    throw err;
-  }
-};
+  };
 
   const updateStudent = async (id: string, updates: Partial<Student>): Promise<void> => {
     let targetStudent: Student | undefined;
