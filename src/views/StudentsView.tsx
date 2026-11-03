@@ -22,7 +22,6 @@ interface StudentsViewProps {
   onPrintAdmissionSlip: (student: Student) => void;
 }
 
-// دالة مساعدة موحدة ومضبوطة للتحقق مما إذا كان حقل gender مسجلاً كأنثى بأي صيغة
 const checkIsFemale = (genderValue: string | undefined | null): boolean => {
   if (!genderValue) return false;
   const normalized = String(genderValue).trim().toLowerCase();
@@ -57,15 +56,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  // Drop student modal
   const [studentToDrop, setStudentToDrop] = useState<Student | null>(null);
   const [dropReason, setDropReason] = useState('انتقال لظروف عائلية أو سكنية');
   const [actionSuccessNotice, setActionSuccessNotice] = useState<string | null>(null);
   
-  // Permanent delete modal
   const [studentToDeletePermanent, setStudentToDeletePermanent] = useState<Student | null>(null);
 
-  // Form state
   const [studentBranchId, setStudentBranchId] = useState<string>(
     selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
   );
@@ -86,7 +82,31 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Filter students based on branch and criteria
+  // دالة البحث الذكي عن الأشقاء (عن طريق رقم الهاتف أَوْ تشابه اسم الأب والجد)
+  const detectedSiblings = useMemo(() => {
+    const cleanPhone = guardianPhone.replace(/\D/g, '').slice(-9);
+    const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
+    // اسم الأب والجد (الجزء الثاني والثالث والرابع من الاسم)
+    const fatherNamePattern = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : '';
+
+    if (!cleanPhone && fatherNamePattern.length < 3) return [];
+
+    return students.filter(s => {
+      if (editingStudentId && s.id === editingStudentId) return false;
+
+      // 1. مطابقة الهاتف (الأب أو الأم)
+      const sPhone = s.guardianPhone ? s.guardianPhone.replace(/\D/g, '').slice(-9) : '';
+      const isPhoneMatch = cleanPhone.length >= 9 && sPhone === cleanPhone;
+
+      // 2. مطابقة اسم الأب والجد
+      const sNameParts = s.fullName.trim().split(/\s+/).filter(Boolean);
+      const sFatherNamePattern = sNameParts.length >= 2 ? sNameParts.slice(1).join(' ') : '';
+      const isNameMatch = fatherNamePattern.length >= 4 && sFatherNamePattern.includes(fatherNamePattern);
+
+      return isPhoneMatch || isNameMatch;
+    });
+  }, [guardianPhone, fullName, students, editingStudentId]);
+
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const isFemale = checkIsFemale(s.gender);
@@ -110,7 +130,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     });
   }, [students, selectedBranchId, statusFilter, genderFilter, stageFilter, groupFilter, bannedFilter, searchQuery, checkStudentBan]);
 
-  // Selected Group Helper for Tahfeez & Tarbawi
   const selectedTahfeezGroup = groups.find(g => g.id === tahfeezGroupId);
   const selectedTahfeezTeacher = teachers.find(t => t.id === selectedTahfeezGroup?.teacherId);
 
@@ -119,12 +138,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
 
   const handleGuardianPhoneChange = (val: string) => {
     setGuardianPhone(val);
-    const cleaned = val.replace(/\D/g, '').replace(/^0+/, '');
-    const norm = cleaned.startsWith('20') ? cleaned : '20' + cleaned;
-    const existingWithSamePhone = students.find(s => s.guardianPhone === norm || s.guardianPhone.endsWith(cleaned.slice(-9)));
-    if (existingWithSamePhone?.familyId) {
-      setFamilyId(existingWithSamePhone.familyId);
-    }
   };
 
   const handleStageChange = (newStage: EducationalStage) => {
@@ -208,7 +221,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     const studentData = {
       branchId: studentBranchId,
       fullName: fullName.trim(),
-      gender: gender, // تُرسل 'female' أو 'male' صراحةً
+      gender: gender,
       grade,
       stage,
       guardianPhone: finalPhone,
@@ -216,7 +229,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       feeMode: isOrphan ? feeMode : 'normal',
       feeDiscountAmount: isOrphan ? feeDiscountAmount : 0,
       feeReason: isOrphan ? feeReason : '',
-      familyId: familyId || undefined,
+      familyId: familyId || (detectedSiblings.length > 0 ? (detectedSiblings[0].familyId || detectedSiblings[0].id) : undefined),
       joinDate,
       notes: notes.trim(),
       status: 'active' as const,
@@ -322,7 +335,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
+      {/* Filter Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[#FFFFFF] p-3.5 rounded-xl border border-[#E8DCCF] no-print">
         <div className="relative sm:col-span-1">
           <Search className="w-4 h-4 absolute right-3 top-2.5 text-[#8C6D53]" />
@@ -405,12 +418,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       )}
 
-      {/* Admission / Edit Student Modal */}
+      {/* Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-6 md:pt-10 overflow-y-auto printable-admission-modal">
           <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-xl overflow-hidden my-auto max-h-[90vh] flex flex-col print:max-h-none print:shadow-none print:border-none">
             
-            {/* Modal Header */}
             <div className="bg-[#4A2F18] p-4 text-white flex items-center justify-between shrink-0 no-print">
               <div>
                 <h3 className="text-sm font-bold">
@@ -426,7 +438,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
               </button>
             </div>
 
-            {/* Modal Form Body */}
             <form onSubmit={handleSubmitStudent} className="p-6 space-y-4 overflow-y-auto flex-1 print:overflow-visible print:p-0">
               
               {formError && (
@@ -436,7 +447,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               )}
 
-              {/* 0. Branch Selection */}
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">
                   الفرع / المدرسة المخصصة <span className="text-red-600">*</span>
@@ -452,7 +462,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </select>
               </div>
 
-              {/* 1. Full 4-part name */}
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">
                   الاسم رباعي (إلزامي، 4 أجزاء على الأقل) <span className="text-red-600">*</span>
@@ -467,7 +476,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 />
               </div>
 
-              {/* 1.1 Gender Selection */}
               <div>
                 <label className="block text-xs font-bold text-[#4A2F18] mb-1">
                   النوع (الجنس) <span className="text-red-600">*</span>
@@ -499,7 +507,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 2. Educational Stage & Grade */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">المرحلة الدراسية</label>
@@ -526,14 +533,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 3. Core Departments & Groups Selection */}
               <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-3">
                 <div className="text-xs font-extrabold text-[#4A2F18] flex items-center justify-between">
                   <span>توزيع القسمين الأساسيين (مجموعة لكل قسم)</span>
                   <span className="text-[11px] text-[#8C6D53]">المعلم والميعاد يملآن تلقائياً</span>
                 </div>
 
-                {/* Tahfeez Group */}
                 <div className="bg-white p-2.5 rounded-lg border border-[#E8DCCF]">
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">مجموعة قسم التحفيظ القرآني</label>
                   <select
@@ -551,7 +556,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   </div>
                 </div>
 
-                {/* Tarbawi Group */}
                 <div className="bg-white p-2.5 rounded-lg border border-[#E8DCCF]">
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">مجموعة لقاء الجمعة (التربوي)</label>
                   <select
@@ -570,11 +574,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 4. Guardian WhatsApp Phone & Sibling Linking */}
+              {/* رقم ولي الأمر وربط الإخوة المطور */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">
-                    رقم ولي الأمر (واتساب) <span className="text-red-600">*</span>
+                    رقم ولي الأمر - الأب/الأم (واتساب) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="tel"
@@ -588,21 +592,36 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">ربط الإخوة (الأسرة لخصم 10 ج)</label>
+                  <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+                    ربط الإخوة (الأسرة لخصم 10 ج)
+                  </label>
                   <select
                     value={familyId}
                     onChange={(e) => setFamilyId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5]"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-[#FBF8F5] font-medium text-[#4A2F18]"
                   >
                     <option value="">طالب منفرد (بدون أسرة مسجلة)</option>
+
+                    {/* قائمة الأشقاء المكتشفين تلقائياً */}
+                    {detectedSiblings.map(s => (
+                      <option key={s.id} value={s.familyId || s.id}>
+                        شقيق/ة مسجل/ة: {s.fullName} ({s.grade})
+                      </option>
+                    ))}
+
                     {families.map(f => (
                       <option key={f.id} value={f.id}>{f.familyName} ({f.note})</option>
                     ))}
                   </select>
+
+                  {detectedSiblings.length > 0 && (
+                    <span className="text-[10px] text-emerald-700 font-bold block mt-1">
+                      ✓ تم اكتشاف ({detectedSiblings.length}) شقيق/ة برقم الهاتف أو الاسم!
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* 5. Orphan Status & Fee Mode */}
               <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5">
                 <div className="flex items-center gap-2">
                   <input
@@ -658,7 +677,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 )}
               </div>
 
-              {/* 6. Date & Notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">تاريخ الالتحاق</label>
@@ -681,7 +699,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* 7. Agreement Checkbox */}
               <div className="p-3 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -691,11 +708,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer shrink-0"
                 />
                 <label htmlFor="agreementCheckbox" className="text-xs font-bold text-[#4A2F18] cursor-pointer">
-                  اطلع ولي الأمر على شروط الالتحاق الثمانية بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
+                  اطّلع ولي الأمر على شروط الالتحاق الثمانية بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
                 </label>
               </div>
 
-              {/* Form Actions */}
               <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DCCF] no-print">
                 <button
                   type="button"
@@ -718,7 +734,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       )}
 
-      {/* Students Data Table */}
+      {/* Table Section */}
       <div className="bg-[#FFFFFF] rounded-2xl border border-[#E8DCCF] overflow-hidden shadow-2xs no-print">
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse text-xs">
@@ -749,14 +765,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   const absenceCount = getStudentAbsenceCountThisMonth(student.id);
                   const tahfeezGrp = groups.find(g => g.id === student.tahfeezGroupId);
                   const tarbawiGrp = groups.find(g => g.id === student.tarbawiGroupId);
-                  
-                  // التحقق من حالة الأنثى
                   const isFemale = checkIsFemale(student.gender);
 
                   return (
                     <tr key={student.id} className={`hover:bg-[#FDFBF9] transition ${student.status === 'dropped' ? 'bg-amber-50/20' : ''}`}>
-                      
-                      {/* Name & Sibling Indicator */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <button
@@ -787,7 +799,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
-                      {/* Gender Column */}
                       <td className="py-3 px-3">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                           isFemale 
@@ -798,7 +809,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         </span>
                       </td>
 
-                      {/* Stage & Grade */}
                       <td className="py-3 px-3">
                         <span className="text-[#4A2F18] font-medium">{student.grade}</span>
                         <span className="block text-[10px] text-[#8C6D53]">
@@ -807,7 +817,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         </span>
                       </td>
 
-                      {/* Tahfeez Group */}
                       <td className="py-3 px-3">
                         <span className="text-[#4A2F18] font-medium">{tahfeezGrp?.name || '—'}</span>
                         <span className="block text-[10px] text-[#8C6D53]">
@@ -815,7 +824,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         </span>
                       </td>
 
-                      {/* Tarbawi Group */}
                       <td className="py-3 px-3">
                         <span className="text-[#4A2F18] font-medium">{tarbawiGrp?.name || '—'}</span>
                         <span className="block text-[10px] text-[#8C6D53]">
@@ -823,7 +831,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         </span>
                       </td>
 
-                      {/* Enrollment Status */}
                       <td className="py-3 px-3">
                         {student.status === 'active' ? (
                           <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200 inline-block">
@@ -842,7 +849,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
-                      {/* Absence Counter */}
                       <td className="py-3 px-3">
                         <span className={`font-bold tabular-nums text-xs ${
                           absenceCount >= 8 ? 'text-red-700 font-black' :
@@ -858,7 +864,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
-                      {/* Fee Mode */}
                       <td className="py-3 px-3">
                         {student.feeMode === 'exempt' ? (
                           <span className="text-emerald-700 font-bold text-[11px]">معفى (0 ج)</span>
@@ -869,7 +874,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
-                      {/* Ban Status */}
                       <td className="py-3 px-3">
                         {banInfo.isBanned ? (
                           <div className="flex items-center gap-1.5 text-red-700 font-bold bg-red-50 px-2 py-1 rounded-md border border-red-200">
@@ -885,10 +889,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                         )}
                       </td>
 
-                      {/* Actions */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Edit Student Button */}
                           {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
                             <button
                               onClick={() => handleOpenEdit(student)}
@@ -914,7 +916,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                             <Printer className="w-4 h-4" />
                           </button>
 
-                          {/* Drop or Reactivate Actions */}
                           {student.status === 'dropped' ? (
                             <button
                               onClick={() => {
@@ -943,7 +944,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                             )
                           )}
 
-                          {/* Admin Permanent Delete */}
                           {currentUser.role === 'admin' && (
                             <button
                               onClick={() => setStudentToDeletePermanent(student)}
@@ -965,7 +965,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       </div>
 
-      {/* Modal: Record Student Dropout */}
+      {/* Modal Drop */}
       {studentToDrop && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DCCF] shadow-xl p-5 space-y-4">
@@ -1020,7 +1020,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         </div>
       )}
 
-      {/* Modal: Permanent Deletion */}
+      {/* Modal Delete */}
       {studentToDeletePermanent && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl max-w-md w-full border border-red-200 shadow-xl p-5 space-y-4">
