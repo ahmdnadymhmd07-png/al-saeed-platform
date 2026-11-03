@@ -173,7 +173,11 @@ export const mappers = {
   },
 
   student: {
-    toDb: (s: Student) => ({
+  toDb: (s: Student) => {
+    // 💡 نتأكد أن family_id هو معرف عائلة صحيح يبدأ بـ fam_ أو UUID وليس معرف طالب شقيق
+    const validFamilyId = (s.familyId && s.familyId.startsWith('fam_')) ? s.familyId : null;
+
+    return {
       id: s.id,
       branch_id: s.branchId,
       full_name: s.fullName,
@@ -185,7 +189,7 @@ export const mappers = {
       fee_mode: s.feeMode,
       fee_discount_amount: s.feeDiscountAmount,
       fee_reason: s.feeReason || null,
-      family_id: (s.familyId && s.familyId.length > 5 && !s.familyId.startsWith('s')) ? s.familyId : null,
+      family_id: validFamilyId, // 👈 إرسال null إذا لم ينشأ سجل العائلة بعد لعدم إفشال الحفظ
       join_date: s.joinDate,
       status: s.status,
       dropped_reason: s.droppedReason || null,
@@ -195,7 +199,8 @@ export const mappers = {
       tahfeez_group_id: s.tahfeezGroupId,
       tarbawi_group_id: s.tarbawiGroupId,
       notes: s.notes || null
-    }),
+    };
+  },
     fromDb: (r: any): Student => {
       const rawGender = String(r.gender || '').replace(/['"]/g, '').trim().toLowerCase();
       
