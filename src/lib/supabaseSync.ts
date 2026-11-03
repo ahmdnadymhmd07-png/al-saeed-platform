@@ -25,10 +25,98 @@ import {
 } from '../types';
 import { OFFICIAL_SCHOOL_LOGO } from '../data/initialData';
 
-// 💡 دالة معالجة التواريخ (تم رفعها في الأعلى لمنع خطأ الاستدعاء المبكر)
+// 💡 دالة معالجة التواريخ
 function sDate(d: any): string {
   if (!d) return new Date().toISOString().slice(0, 10);
   return String(d).slice(0, 10);
+}
+
+// =========================================================================
+// 📦 إدارة طابور التخزين المحلي والمزامنة عند انقطاع الإنترنت (Offline Queue)
+// =========================================================================
+const OFFLINE_QUEUE_KEY = 'alsaeed_offline_sync_queue';
+
+interface QueueItem {
+  id: string;
+  tableName: string;
+  action: 'upsert' | 'delete';
+  record: any;
+  timestamp: number;
+}
+
+function getOfflineQueue(): QueueItem[] {
+  try {
+    const data = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue: QueueItem[]) {
+  try {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  } catch (err) {
+    console.error('Failed to save offline queue', err);
+  }
+}
+
+function addToOfflineQueue(tableName: string, action: 'upsert' | 'delete', record: any) {
+  const queue = getOfflineQueue();
+  const newItem: QueueItem = {
+    id: record.id || 'q_' + Date.now() + Math.random().toString(36).substring(2, 5),
+    tableName,
+    action,
+    record,
+    timestamp: Date.now()
+  };
+  
+  // دمج وتحديث التعديلات لنفس السجل لمنع التكرار
+  const filtered = queue.filter(q => !(q.tableName === tableName && q.record.id === record.id));
+  filtered.push(newItem);
+  saveOfflineQueue(filtered);
+  console.log(`[Offline Queue] تم حفظ العملية محلياً لجدول "${tableName}" لعدم توفر إنترنت.`);
+}
+
+// 🔄 دالة تفريغ المزامنة وتطبيق الطابور على Supabase فور توفر الشبكة
+export async function processOfflineQueue(): Promise<{ processed: number; failed: number }> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return { processed: 0, failed: 0 };
+  
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return { processed: 0, failed: 0 };
+
+  console.log(`[Offline Sync] بدء مزامنة ${queue.length} عنصر مع Supabase...`);
+  let processed = 0;
+  let failed = 0;
+  const remainingQueue: QueueItem[] = [];
+
+  for (const item of queue) {
+    try {
+      if (item.action === 'upsert') {
+        const { error } = await supabase.from(item.tableName).upsert(item.record);
+        if (error) throw error;
+      } else if (item.action === 'delete') {
+        const { error } = await supabase.from(item.tableName).delete().eq('id', item.record.id);
+        if (error) throw error;
+      }
+      processed++;
+    } catch (err) {
+      console.error(`[Offline Sync Error] فشل رفع عنصر من جدول ${item.tableName}:`, err);
+      failed++;
+      remainingQueue.push(item);
+    }
+  }
+
+  saveOfflineQueue(remainingQueue);
+  return { processed, failed };
+}
+
+// الاستماع لعودة الاتصال لرفع البيانات المتبقية تلقائياً
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('[Network] عادت الشبكة! بدء المزامنة التلقائية...');
+    processOfflineQueue();
+  });
 }
 
 // =========================================================================
@@ -173,34 +261,33 @@ export const mappers = {
   },
 
   student: {
-  toDb: (s: Student) => {
-    // 💡 نتأكد أن family_id هو معرف عائلة صحيح يبدأ بـ fam_ أو UUID وليس معرف طالب شقيق
-    const validFamilyId = (s.familyId && s.familyId.startsWith('fam_')) ? s.familyId : null;
+    toDb: (s: Student) => {
+      const validFamilyId = (s.familyId && s.familyId.startsWith('fam_')) ? s.familyId : null;
 
-    return {
-      id: s.id,
-      branch_id: s.branchId,
-      full_name: s.fullName,
-      gender: s.gender || 'male',
-      grade: s.grade,
-      stage: s.stage,
-      guardian_phone: s.guardianPhone,
-      is_orphan: s.isOrphan,
-      fee_mode: s.feeMode,
-      fee_discount_amount: s.feeDiscountAmount,
-      fee_reason: s.feeReason || null,
-      family_id: validFamilyId, // 👈 إرسال null إذا لم ينشأ سجل العائلة بعد لعدم إفشال الحفظ
-      join_date: s.joinDate,
-      status: s.status,
-      dropped_reason: s.droppedReason || null,
-      dropped_date: s.droppedDate || null,
-      agreement_accepted: s.agreementAccepted,
-      agreement_date: s.agreementDate,
-      tahfeez_group_id: s.tahfeezGroupId,
-      tarbawi_group_id: s.tarbawiGroupId,
-      notes: s.notes || null
-    };
-  },
+      return {
+        id: s.id,
+        branch_id: s.branchId,
+        full_name: s.fullName,
+        gender: s.gender || 'male',
+        grade: s.grade,
+        stage: s.stage,
+        guardian_phone: s.guardianPhone,
+        is_orphan: s.isOrphan,
+        fee_mode: s.feeMode,
+        fee_discount_amount: s.feeDiscountAmount,
+        fee_reason: s.feeReason || null,
+        family_id: validFamilyId,
+        join_date: s.joinDate,
+        status: s.status,
+        dropped_reason: s.droppedReason || null,
+        dropped_date: s.droppedDate || null,
+        agreement_accepted: s.agreementAccepted,
+        agreement_date: s.agreementDate,
+        tahfeez_group_id: s.tahfeezGroupId,
+        tarbawi_group_id: s.tarbawiGroupId,
+        notes: s.notes || null
+      };
+    },
     fromDb: (r: any): Student => {
       const rawGender = String(r.gender || '').replace(/['"]/g, '').trim().toLowerCase();
       
@@ -675,6 +762,8 @@ export async function fetchTable<T>(
   fallback: T[]
 ): Promise<T[]> {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return fallback;
+
     const { data, error } = await supabase.from(tableName).select('*');
     if (error) {
       console.warn(`[Supabase] Error fetching "${tableName}": ${error.message}`);
@@ -691,21 +780,27 @@ export async function fetchTable<T>(
 }
 
 /**
- * Upsert single record to Supabase (مع إظهار الأخطاء صراحة)
+ * Upsert single record to Supabase (دعم العمل أوفلاين وسلس)
  */
 export async function upsertRecord(tableName: string, record: any): Promise<boolean> {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      addToOfflineQueue(tableName, 'upsert', record);
+      return true;
+    }
+
     const { error } = await supabase.from(tableName).upsert(record);
     if (error) {
-      console.error(`[Supabase Error] فشل الحفظ في "${tableName}":`, error.message);
-      alert(`خطأ من Supabase أثناء الحفظ في جدول (${tableName}):\n${error.message}`);
-      return false;
+      console.warn(`[Supabase Error] تعذر الحفظ المباشر في "${tableName}"، تحويل للطابور:`, error.message);
+      addToOfflineQueue(tableName, 'upsert', record);
+      return true;
     }
     console.log(`[Supabase Success] تم الحفظ بنجاح في "${tableName}"`);
     return true;
   } catch (err: any) {
-    console.error(`[Supabase Exception] "${tableName}":`, err);
-    return false;
+    console.warn(`[Supabase Exception] تحويل للطابور المحلي لجدول "${tableName}":`, err);
+    addToOfflineQueue(tableName, 'upsert', record);
+    return true;
   }
 }
 
@@ -715,15 +810,22 @@ export async function upsertRecord(tableName: string, record: any): Promise<bool
 export async function insertBatch(tableName: string, records: any[]): Promise<boolean> {
   if (!records || records.length === 0) return true;
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      records.forEach(r => addToOfflineQueue(tableName, 'upsert', r));
+      return true;
+    }
+
     const { error } = await supabase.from(tableName).upsert(records);
     if (error) {
-      console.error(`[Supabase Error] فشل الدُفعة في "${tableName}":`, error.message);
-      return false;
+      console.warn(`[Supabase Batch Error] تحويل الدفعة للطابور المحلي:`, error.message);
+      records.forEach(r => addToOfflineQueue(tableName, 'upsert', r));
+      return true;
     }
     return true;
   } catch (err: any) {
-    console.error(`[Supabase Exception] Batch "${tableName}":`, err);
-    return false;
+    console.warn(`[Supabase Batch Exception] تحويل الدفعة للطابور المحلي:`, err);
+    records.forEach(r => addToOfflineQueue(tableName, 'upsert', r));
+    return true;
   }
 }
 
@@ -732,14 +834,21 @@ export async function insertBatch(tableName: string, records: any[]): Promise<bo
  */
 export async function deleteRecord(tableName: string, id: string): Promise<boolean> {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      addToOfflineQueue(tableName, 'delete', { id });
+      return true;
+    }
+
     const { error } = await supabase.from(tableName).delete().eq('id', id);
     if (error) {
-      console.error(`[Supabase Error] فشل الحذف من "${tableName}":`, error.message);
-      return false;
+      console.warn(`[Supabase Delete Error] تحويل عملية الحذف للطابور:`, error.message);
+      addToOfflineQueue(tableName, 'delete', { id });
+      return true;
     }
     return true;
   } catch (err: any) {
-    console.error(`[Supabase Exception] Delete "${tableName}":`, err);
-    return false;
+    console.warn(`[Supabase Delete Exception] تحويل الحذف للطابور:`, err);
+    addToOfflineQueue(tableName, 'delete', { id });
+    return true;
   }
 }
