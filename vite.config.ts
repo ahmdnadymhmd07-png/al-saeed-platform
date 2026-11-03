@@ -11,6 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: 'script-build', // إجبار حقن السكربت تلقائياً
         includeAssets: ['favicon.jpg', 'school_logo.jpg', 'school_logo.png'],
         manifest: {
           short_name: 'منصة السعيد',
