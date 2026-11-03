@@ -61,6 +61,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [actionSuccessNotice, setActionSuccessNotice] = useState<string | null>(null);
   
   const [studentToDeletePermanent, setStudentToDeletePermanent] = useState<Student | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [studentBranchId, setStudentBranchId] = useState<string>(
     selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
@@ -82,11 +83,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // دالة البحث الذكي عن الأشقاء (عن طريق رقم الهاتف أَوْ تشابه اسم الأب والجد)
   const detectedSiblings = useMemo(() => {
     const cleanPhone = guardianPhone.replace(/\D/g, '').slice(-9);
     const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-    // اسم الأب والجد (الجزء الثاني والثالث والرابع من الاسم)
     const fatherNamePattern = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : '';
 
     if (!cleanPhone && fatherNamePattern.length < 3) return [];
@@ -94,11 +93,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     return students.filter(s => {
       if (editingStudentId && s.id === editingStudentId) return false;
 
-      // 1. مطابقة الهاتف (الأب أو الأم)
       const sPhone = s.guardianPhone ? s.guardianPhone.replace(/\D/g, '').slice(-9) : '';
       const isPhoneMatch = cleanPhone.length >= 9 && sPhone === cleanPhone;
 
-      // 2. مطابقة اسم الأب والجد
       const sNameParts = s.fullName.trim().split(/\s+/).filter(Boolean);
       const sFatherNamePattern = sNameParts.length >= 2 ? sNameParts.slice(1).join(' ') : '';
       const isNameMatch = fatherNamePattern.length >= 4 && sFatherNamePattern.includes(fatherNamePattern);
@@ -191,7 +188,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     setIsFormOpen(true);
   };
 
-  const handleSubmitStudent = (e: React.FormEvent) => {
+  // 🚀 الدالة أصبحت async مع استخدام await للحفظ المباشر والدائم في Supabase
+  const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -218,38 +216,49 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       return;
     }
 
-    const studentData = {
-      branchId: studentBranchId,
-      fullName: fullName.trim(),
-      gender: gender,
-      grade,
-      stage,
-      guardianPhone: finalPhone,
-      isOrphan,
-      feeMode: isOrphan ? feeMode : 'normal',
-      feeDiscountAmount: isOrphan ? feeDiscountAmount : 0,
-      feeReason: isOrphan ? feeReason : '',
-      familyId: familyId || (detectedSiblings.length > 0 ? (detectedSiblings[0].familyId || detectedSiblings[0].id) : undefined),
-      joinDate,
-      notes: notes.trim(),
-      status: 'active' as const,
-      agreementAccepted: true,
-      agreementDate: joinDate,
-      tahfeezGroupId,
-      tarbawiGroupId
-    };
+    setIsSubmitting(true);
 
-    if (editingStudentId) {
-      updateStudent(editingStudentId, studentData);
-      setActionSuccessNotice(`تم تعديل بيانات الطالب (${fullName.trim()}) بنجاح!`);
-      setTimeout(() => setActionSuccessNotice(null), 4000);
-      setIsFormOpen(false);
-      resetFormFields();
-    } else {
-      const newStudent = addStudent(studentData);
-      setIsFormOpen(false);
-      resetFormFields();
-      onPrintAdmissionSlip(newStudent);
+    try {
+      const studentData = {
+        branchId: studentBranchId,
+        fullName: fullName.trim(),
+        gender: gender,
+        grade,
+        stage,
+        guardianPhone: finalPhone,
+        isOrphan,
+        feeMode: isOrphan ? feeMode : 'normal',
+        feeDiscountAmount: isOrphan ? feeDiscountAmount : 0,
+        feeReason: isOrphan ? feeReason : '',
+        familyId: familyId || (detectedSiblings.length > 0 ? (detectedSiblings[0].familyId || detectedSiblings[0].id) : undefined),
+        joinDate,
+        notes: notes.trim(),
+        status: 'active' as const,
+        agreementAccepted: true,
+        agreementDate: joinDate,
+        tahfeezGroupId,
+        tarbawiGroupId
+      };
+
+      if (editingStudentId) {
+        await updateStudent(editingStudentId, studentData);
+        setActionSuccessNotice(`تم تعديل بيانات الطالب (${fullName.trim()}) بنجاح!`);
+        setTimeout(() => setActionSuccessNotice(null), 4000);
+        setIsFormOpen(false);
+        resetFormFields();
+      } else {
+        // ✨ الاستدعاء المعالج هنا مع await
+        const newStudent = await addStudent(studentData);
+        setIsFormOpen(false);
+        resetFormFields();
+        if (newStudent) {
+          onPrintAdmissionSlip(newStudent);
+        }
+      }
+    } catch (err: any) {
+      setFormError('حدث خطأ أثناء حفظ البيانات في Supabase: ' + (err?.message || 'خطأ غير معروف'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -432,7 +441,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
               </div>
               <button 
                 onClick={() => setIsFormOpen(false)}
-                className="text-white hover:text-red-200 p-1 rounded-lg transition cursor-pointer"
+                disabled={isSubmitting}
+                className="text-white hover:text-red-200 p-1 rounded-lg transition cursor-pointer disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -574,7 +584,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 </div>
               </div>
 
-              {/* رقم ولي الأمر وربط الإخوة المطور */}
+              {/* رقم ولي الأمر وربط الإخوة */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4A2F18] mb-1">
@@ -602,7 +612,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   >
                     <option value="">طالب منفرد (بدون أسرة مسجلة)</option>
 
-                    {/* قائمة الأشقاء المكتشفين تلقائياً */}
                     {detectedSiblings.map(s => (
                       <option key={s.id} value={s.familyId || s.id}>
                         شقيق/ة مسجل/ة: {s.fullName} ({s.grade})
@@ -716,16 +725,22 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg transition cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-bold text-[#6D4C3D] hover:bg-[#F6EEE4] rounded-lg transition cursor-pointer disabled:opacity-50"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg transition shadow-xs cursor-pointer flex items-center gap-2"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#4A2F18] hover:bg-[#382312] rounded-lg transition shadow-xs cursor-pointer flex items-center gap-2 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{editingStudentId ? 'تحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>{isSubmitting ? 'جارٍ الحفظ في Supabase...' : editingStudentId ? 'تحديث البيانات' : 'حفظ الطالب وطباعة الاستمارة'}</span>
                 </button>
               </div>
 
