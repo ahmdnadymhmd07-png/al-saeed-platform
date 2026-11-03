@@ -50,7 +50,7 @@ import {
   initialAuditLogs,
   OFFICIAL_SCHOOL_LOGO
 } from '../data/initialData';
-import { testSupabaseConnection } from '../lib/supabase';
+import { testSupabaseConnection, supabase } from '../lib/supabase';
 import {
   mappers,
   fetchTable,
@@ -59,7 +59,6 @@ import {
   deleteRecord
 } from '../lib/supabaseSync';
 
-// 🧠 دالة ذكية معالجة لحقل النوع لمنع NULL أو UNDEFINED القادم من Supabase
 const normalizeStudent = (s: any): Student => {
   let gender: 'male' | 'female' = 'male';
   const rawGender = String(s?.gender || s?.sex || '').trim().toLowerCase();
@@ -69,7 +68,6 @@ const normalizeStudent = (s: any): Student => {
   } else if (rawGender === 'male' || rawGender === 'ذكر') {
     gender = 'male';
   } else {
-    // التنبؤ بالنوع بناءً على الاسم إذا كان الحقل في قاعدة البيانات NULL
     const cleanName = String(s?.fullName || s?.full_name || '').trim().replace(/[\u064B-\u0652]/g, '');
     const firstName = cleanName.split(/\s+/)[0] || '';
     const femaleNames = new Set([
@@ -123,8 +121,8 @@ interface AppContextType {
   getStudentAbsenceCountThisMonth: (studentId: string, month?: string) => number;
   getStudentPoints: (studentId: string) => number;
 
-  addStudent: (student: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) => Student;
-  updateStudent: (id: string, updates: Partial<Student>) => void;
+  addStudent: (student: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Student>;
+  updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string, permanent?: boolean) => void;
   
   saveStudentAttendanceBatch: (records: { 
@@ -201,15 +199,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_PREFIX = 'alsaeed_v2_live_';
 const AUTH_KEY = 'alsaeed_authenticated_user_id';
-
-try {
-  const legacyPrefix = 'alsaeed_quran_platform_';
-  ['students', 'families', 'studentAttendance', 'teacherAttendance', 'disciplineCases', 'dues', 'payments', 'sales', 'rewardGrants', 'pointsLedger', 'studentNotes', 'messageLogs'].forEach(k => {
-    localStorage.removeItem(legacyPrefix + k);
-  });
-} catch {
-  // Ignore
-}
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -461,12 +450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (dbDepts.length > 0) setDepartments(dbDepts);
       if (dbTeachers.length > 0) setTeachers(dbTeachers);
       if (dbGroups.length > 0) setGroups(dbGroups);
-      
-      // تطبيق المعالجة والتنظيف الذكي لجداول الطلاب لمنع حقل NULL في gender
-      if (dbStudents.length > 0) {
-        setStudents(dbStudents.map(normalizeStudent));
-      }
-      
+      if (dbStudents.length > 0) setStudents(dbStudents.map(normalizeStudent));
       if (dbFamilies.length > 0) setFamilies(dbFamilies);
       if (dbStudentAtt.length > 0) setStudentAttendance(dbStudentAtt);
       if (dbTeacherAtt.length > 0) setTeacherAttendance(dbTeacherAtt);
@@ -631,29 +615,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const addStudent = (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) => {
+  // 🚀 دالة إضافة الطالب المعدلة لحفظ البيانات والعائلة المربوطة فوراً في Supabase
+  const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> => {
+    let finalFamilyId = studentData.familyId;
+
+    // 1. معالجة إنشاء سجل عائلة جديد في جدول families إذا كان الطالب مرتبطاً بشقيق
+    if (finalFamilyId && !finalFamilyId.includes('-')) {
+      const siblingStudent = students.find(s => s.id === finalFamilyId);
+      const familyName = siblingStudent 
+        ? `عائلة ${siblingStudent.fullName.split(' ').slice(1).join(' ')}` 
+        : `عائلة ${studentData.fullName.split(' ').slice(1).join(' ')}`;
+
+      const { data: newFamily, error: famError } = await supabase
+        .from('families')
+        .insert([{ 
+          family_name: familyName, 
+          guardian_phone: studentData.guardianPhone, 
+          note: 'ربط إخوة تلقائي' 
+        }])
+        .select()
+        .single();
+
+      if (!famError && newFamily) {
+        finalFamilyId = newFamily.id;
+        setFamilies(prev => [...prev, { id: newFamily.id, familyName, guardianPhone: studentData.guardianPhone }]);
+        
+        // ربط الطالب الشقيق بالعائلة الجديدة في Supabase
+        if (siblingStudent) {
+          await supabase.from('students').update({ family_id: newFamily.id }).eq('id', siblingStudent.id);
+          setStudents(prev => prev.map(s => s.id === siblingStudent.id ? { ...s, familyId: newFamily.id } : s));
+        }
+      }
+    }
+
     const id = 's' + Date.now();
     const newStudent: Student = normalizeStudent({
       ...studentData,
+      familyId: finalFamilyId,
       id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+
+    // 2. رفع الحفظ صراحة إلى Supabase أولاً
+    await upsertRecord('students', mappers.student.toDb(newStudent));
+
+    // 3. تحديث الـ State بعد نجاح الإرسال
     setStudents(prev => [newStudent, ...prev]);
-    addAuditLog('إضافة طالب', `تسجيل الطالب الجديد ${studentData.fullName} في الفرع`);
-    upsertRecord('students', mappers.student.toDb(newStudent));
+    addAuditLog('إضافة طالب', `تسجيل الطالب الجديد ${studentData.fullName} في قاعدة البيانات`);
+    
     return newStudent;
   };
 
-  const updateStudent = (id: string, updates: Partial<Student>) => {
+  const updateStudent = async (id: string, updates: Partial<Student>): Promise<void> => {
+    let targetStudent: Student | undefined;
+
     setStudents(prev => {
       const updatedList = prev.map(s => s.id === id ? normalizeStudent({ ...s, ...updates, updatedAt: new Date().toISOString() }) : s);
-      const target = updatedList.find(s => s.id === id);
-      if (target) {
-        upsertRecord('students', mappers.student.toDb(target));
-      }
+      targetStudent = updatedList.find(s => s.id === id);
       return updatedList;
     });
+
+    if (targetStudent) {
+      await upsertRecord('students', mappers.student.toDb(targetStudent));
+    }
     addAuditLog('تعديل بيانات طالب', `تعديل بيانات الطالب رقم ${id}`);
   };
 
