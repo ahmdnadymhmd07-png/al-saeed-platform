@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Student } from '../types';
 import { 
@@ -9,10 +9,7 @@ import {
   AlertTriangle, 
   FileText, 
   ShieldAlert, 
-  Printer, 
-  Plus, 
-  PhoneCall, 
-  Eye 
+  Printer
 } from 'lucide-react';
 
 interface StudentModalProps {
@@ -23,25 +20,47 @@ interface StudentModalProps {
 
 export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onPrintAdmissionSlip }) => {
   const { 
+    students,
     groups, 
     teachers, 
     studentAttendance, 
     dues, 
     payments, 
-    pointsLedger, 
     rewardGrants, 
     disciplineCases, 
     studentNotes, 
     addStudentNote, 
     checkStudentBan, 
     getStudentAbsenceCountThisMonth, 
-    getStudentPoints,
-    currentUser 
+    getStudentPoints
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'finance' | 'points' | 'discipline' | 'notes'>('info');
   const [noteType, setNoteType] = useState<'appearance' | 'behavior' | 'guardian_contact'>('behavior');
   const [noteText, setNoteText] = useState('');
+
+  // البحث عن أشقاء الطالب برقم الهاتف أو باسم الأب/الجد
+  const siblings = useMemo(() => {
+    if (!student) return [];
+    const cleanPhone = student.guardianPhone ? student.guardianPhone.replace(/\D/g, '').slice(-9) : '';
+    const nameParts = student.fullName.trim().split(/\s+/).filter(Boolean);
+    const fatherNamePattern = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : '';
+
+    return students.filter(s => {
+      if (s.id === student.id) return false;
+
+      // مطابقة الهاتف (أب أو أم)
+      const sPhone = s.guardianPhone ? s.guardianPhone.replace(/\D/g, '').slice(-9) : '';
+      const isPhoneMatch = cleanPhone.length >= 9 && sPhone === cleanPhone;
+
+      // مطابقة اسم الأب والجد
+      const sNameParts = s.fullName.trim().split(/\s+/).filter(Boolean);
+      const sFatherNamePattern = sNameParts.length >= 2 ? sNameParts.slice(1).join(' ') : '';
+      const isNameMatch = fatherNamePattern.length >= 4 && sFatherNamePattern.includes(fatherNamePattern);
+
+      return isPhoneMatch || isNameMatch || (student.familyId && s.familyId === student.familyId);
+    });
+  }, [student, students]);
 
   if (!student) return null;
 
@@ -54,7 +73,6 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
 
   const studentAttHistory = studentAttendance.filter(a => a.studentId === student.id).slice(0, 15);
   const studentDuesHistory = dues.filter(d => d.studentId === student.id);
-  const studentPaymentsHistory = payments.filter(p => p.studentId === student.id);
   const studentDisciplineHistory = disciplineCases.filter(c => c.studentId === student.id);
   const studentNotesList = studentNotes.filter(n => n.studentId === student.id);
 
@@ -108,7 +126,6 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
           </div>
         </div>
 
-        {/* Ban banner if banned */}
         {banInfo.isBanned && (
           <div className="bg-red-50 p-3.5 border-b border-red-200 flex items-center gap-3 text-red-900 text-xs">
             <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
@@ -149,7 +166,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
         {/* Tab Contents */}
         <div className="p-6 max-h-[60vh] overflow-y-auto text-xs space-y-4">
           
-          {/* 1. Info Tab */}
+          {/* Info Tab */}
           {activeTab === 'info' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 bg-[#FBF8F5] p-4 rounded-xl border border-[#E8DCCF]">
@@ -176,12 +193,18 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
                 <div>
                   <span className="text-[#8C6D53] block text-[11px]">ربط الأسرة (خصم الإخوة):</span>
                   <span className="font-bold text-[#4A2F18] block mt-0.5">
-                    {student.familyId ? 'مسجل ضمن أسرة (مستفيد من خصم الإخوة)' : 'طالب منفرد'}
+                    {siblings.length > 0 ? (
+                      <span className="text-emerald-700 font-bold">
+                        مرتبط بـ ({siblings.length}) شقيق/ة: {siblings.map(s => `${s.fullName} (${s.grade})`).join('، ')}
+                      </span>
+                    ) : (
+                      'طالب منفرد (لا يوجد أشقاء مسجلون بالنظام)'
+                    )}
                   </span>
                 </div>
               </div>
 
-              {/* Two Core Groups */}
+              {/* Core Groups */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF]">
                   <span className="font-bold text-xs text-[#4A2F18] block">قسم التحفيظ القرآني</span>
@@ -204,7 +227,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
             </div>
           )}
 
-          {/* 2. Attendance History */}
+          {/* Attendance Tab */}
           {activeTab === 'attendance' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-bold text-[#4A2F18]">
@@ -239,7 +262,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
             </div>
           )}
 
-          {/* 3. Finance History */}
+          {/* Finance Tab */}
           {activeTab === 'finance' && (
             <div className="space-y-4">
               <h4 className="font-bold text-xs text-[#4A2F18]">الاستحقاقات الشهرية والغرامات</h4>
@@ -270,7 +293,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
             </div>
           )}
 
-          {/* 4. Points & Rewards */}
+          {/* Points Tab */}
           {activeTab === 'points' && (
             <div className="space-y-3">
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
@@ -293,7 +316,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
             </div>
           )}
 
-          {/* 5. Discipline History */}
+          {/* Discipline Tab */}
           {activeTab === 'discipline' && (
             <div className="space-y-3">
               <h4 className="font-bold text-xs text-[#4A2F18]">سجل قرارات الاستدعاء والإنذارات</h4>
@@ -315,7 +338,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, on
             </div>
           )}
 
-          {/* 6. Notes & Conduct (شروط الالتحاق: الزي الإسلامي والمظهر والسلوك وتواصل ولي الأمر) */}
+          {/* Notes Tab */}
           {activeTab === 'notes' && (
             <div className="space-y-4">
               <form onSubmit={handleAddNote} className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-3">
