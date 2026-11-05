@@ -257,14 +257,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setShowRollPrintModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] rounded-xl text-xs font-bold transition cursor-pointer"
-              title="طباعة كشف حضور الحلقة الورقي للتعليق بالقاعة"
-            >
-              <Printer className="w-4 h-4 text-[#8C6D53]" />
-              <span>طباعة كشف الحلقة الورقي</span>
-            </button>
-            <button
               onClick={handleMarkAllPresent}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] rounded-xl text-xs font-bold transition cursor-pointer"
             >
