@@ -127,7 +127,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
   return (
     <div className="space-y-6">
 
-      {/* 🖨️ التنسيق الخاص بالطباعة لإجبار المتصفح على طباعة التقرير فقط */}
+      {/* 🖨️ التنسيق الخاص بالطباعة لإجبار المتصفح على طباعة التقرير فقط وضبط المسافات */}
       <style>{`
         @media print {
           body * {
@@ -142,7 +142,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onOpenGateReport }) =>
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 20px !important; /* مسافة أمان علوية وجانبية لمنع قص المحتوى */
             box-shadow: none !important;
             border: none !important;
           }
