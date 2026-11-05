@@ -42,7 +42,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
     return groups.find(g => g.departmentId === 'tahfeez')?.id || groups[0]?.id || '';
   });
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  
+   
   // Local attendance state for current sheet: Record<studentId, { status: AttendanceStatus, excuseReason?: string }>
   const [attendanceSheet, setAttendanceSheet] = useState<Record<string, { 
     status: AttendanceStatus; 
@@ -69,7 +69,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
   const groupStudents = useMemo(() => {
     if (!activeGroup) return [];
     return students.filter(s => {
-      if (s.status === 'suspended') return false; // Temporarily suspended do not appear on attendance sheets (FR-15)
+      if (s.status === 'suspended') return false; 
       if (s.status === 'left') return false;
       if (activeGroup.departmentId === 'tahfeez') return s.tahfeezGroupId === activeGroup.id;
       if (activeGroup.departmentId === 'tarbawi') return s.tarbawiGroupId === activeGroup.id;
@@ -84,7 +84,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
       status: AttendanceStatus; 
       excuseReason?: string; 
     }> = {};
-    
+     
     groupStudents.forEach(s => {
       const existing = studentAttendance.find(a => 
         a.studentId === s.id && 
@@ -97,7 +97,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
           excuseReason: existing.excuseReason
         };
       } else {
-        // default: present
         initialMap[s.id] = { 
           status: 'present'
         };
@@ -175,8 +174,71 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
     });
 
     saveStudentAttendanceBatch(records);
-
     setSaveSuccessNotice('تم حفظ تحضير الحلقة بنجاح! احتسبت النقاط وحُدث عداد الغياب.');
+  };
+
+  // 🖨️ دالة طباعة كشف الحلقة بشكل آمن ومنعزل تماماً لمنع أي قص أو ظهور للداشبورد
+  const handlePrintRollSheet = () => {
+    const printContent = document.getElementById('printable-roll-area');
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank', 'width=950,height=750');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html lang="ar" dir="rtl">
+          <head>
+            <meta charset="UTF-8">
+            <title>طباعة كشف حضور الحلقة - مدرسة السعيد</title>
+            <style>
+              body {
+                font-family: 'Cairo', Tahoma, sans-serif;
+                direction: rtl;
+                background: #ffffff;
+                color: #000000;
+                margin: 0;
+                padding: 15px;
+                font-size: 11px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                margin-bottom: 10px;
+              }
+              th, td {
+                border: 1px solid #000000 !important;
+                padding: 6px 8px;
+                text-align: right;
+              }
+              th {
+                background-color: #f3f4f6 !important;
+                font-weight: bold;
+              }
+              .no-print, button, input, select {
+                display: none !important;
+              }
+              .border-b-2 { border-bottom: 2px solid #000; }
+              .border-t { border-top: 1px solid #000; }
+              .text-center { text-align: center; }
+              .font-bold { font-weight: bold; }
+              .font-black { font-weight: 900; }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  window.close();
+                }, 300);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   return (
@@ -325,9 +387,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
                 <BookOpen className="w-6 h-6" />
               </div>
               <p className="font-bold text-[#4A2F18] text-sm">لا توجد حلقة قرآنية مسجلة في هذا القسم حالياً</p>
-              <p className="text-[11px] max-w-sm mx-auto">
-                يمكنك الانتقال لقسم (الفروع والحلقات والمعلمين) لإنشاء حلقة جديدة وتعيين الشيخ المحفظ وجدول المواعيد.
-              </p>
             </div>
           ) : groupStudents.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#8C6D53]">
@@ -343,7 +402,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
               return (
                 <div key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#FDFBF9] transition">
                   
-                  {/* Student Details & Absence Counter */}
                   <div className="flex items-center gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#F6EEE4] text-[#4A2F18] font-bold text-[11px] flex items-center justify-center shrink-0 tabular-nums">
                       {idx + 1}
@@ -377,52 +435,47 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
                     </div>
                   </div>
 
-                  {/* 3-State Interactive Action Buttons (حاضر / غائب / غائب بعذر) */}
+                  {/* 3-State Interactive Action Buttons */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                      
-                      {/* Present */}
-                      <button
-                        type="button"
-                        onClick={() => handleSetStatus(student.id, 'present')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          currentStatus === 'present'
-                            ? 'bg-emerald-700 text-white shadow-xs'
-                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                        }`}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>حاضر</span>
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetStatus(student.id, 'present')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        currentStatus === 'present'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>حاضر</span>
+                    </button>
 
-                      {/* Absent */}
-                      <button
-                        type="button"
-                        onClick={() => handleSetStatus(student.id, 'absent')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          currentStatus === 'absent'
-                            ? 'bg-red-600 text-white shadow-xs'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100'
-                        }`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>غائب</span>
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetStatus(student.id, 'absent')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        currentStatus === 'absent'
+                          ? 'bg-red-600 text-white shadow-xs'
+                          : 'bg-red-50 text-red-600 hover:bg-red-100'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>غائب</span>
+                    </button>
 
-                      {/* Excused (mandatory excuse reason) */}
-                      <button
-                        type="button"
-                        onClick={() => handleSetStatus(student.id, 'excused')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          currentStatus === 'excused'
-                            ? 'bg-amber-600 text-white shadow-xs'
-                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        }`}
-                      >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        <span>غائب بعذر</span>
-                      </button>
-
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSetStatus(student.id, 'excused')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        currentStatus === 'excused'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      }`}
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>غائب بعذر</span>
+                    </button>
+                  </div>
 
                 </div>
               );
@@ -481,7 +534,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintRollSheet}
                   className="px-4 py-1.5 bg-[#B9895B] hover:bg-[#A37549] text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -496,8 +549,8 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
               </div>
             </div>
 
-            {/* Printable Sheet (Crisp black & white A4 printable layout) */}
-            <div className="p-6 sm:p-8 text-black space-y-4">
+            {/* Printable Sheet with ID for isolated printing */}
+            <div id="printable-roll-area" className="p-6 sm:p-8 text-black space-y-4">
               
               {/* Official Header */}
               <div className="border-b-2 border-black pb-3">
@@ -551,7 +604,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
                     {groupStudents.length === 0 ? (
                       <tr>
                         <td colSpan={19} className="py-4 text-center text-gray-500 font-bold">
-                          لا يوجد طلاب مقيدين في هذه الحلقة حالياً
+                          لا يوجد طلاب مقيدون في هذه الحلقة حالياً
                         </td>
                       </tr>
                     ) : (
