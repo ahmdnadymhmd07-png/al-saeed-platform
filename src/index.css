@@ -7,6 +7,8 @@
   body {
     font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* منع الارتداد المزعج للشاشة على الموبايل */
+    overscroll-behavior-y: none;
   }
   .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -27,4 +29,24 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #B9895B;
+}
+
+/* تثبيت التبويبات والعناصر على الهواتف لمنع الشكل العائم أو الاهتزاز */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* تثبيت الشريط العلوي وشريط التنقل بدقة تامة */
+  header, nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  /* ضبط مقاسات الأزرار وحقول الاختيار لتناسب اللمس الميداني المريح */
+  button, select, input {
+    min-height: 40px;
+  }
 }
