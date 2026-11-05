@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ShieldAlert, Building2, UserCircle, Printer, LogIn, LogOut } from 'lucide-react';
+import { ShieldAlert, Building2, UserCircle, Printer, LogIn, LogOut, CloudDownload, CheckCircle, Wifi, WifiOff } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 import { NavTab } from './Navigation';
+import { saveStudentsLocally } from '../services/db';
 
 interface HeaderProps {
   onOpenGateReport: () => void;
@@ -24,6 +25,33 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGateReport, onNavigate }) 
   } = useApp();
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success'>('idle');
+  const isOnline = navigator.onLine;
+
+  // دالة تحميل وتخزين بيانات الميدان محلياً بضغطة زر واحدة للعمل بدون إنترنت
+  const handleOfflineSync = async () => {
+    try {
+      setIsSyncing(true);
+      
+      // جلب بيانات الطلاب الحالية من التخزين المؤقت أو السياق وتخزينها عبر db.ts
+      const cachedStudentsData = localStorage.getItem('al_saeed_students') || sessionStorage.getItem('students');
+      
+      if (cachedStudentsData) {
+        const studentsList = JSON.parse(cachedStudentsData);
+        await saveStudentsLocally(studentsList);
+      } else if (students && students.length > 0) {
+        await saveStudentsLocally(students);
+      }
+
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    } catch (error) {
+      console.error('فشل التخزين المحلي:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Count banned students in current branch filter
   const filteredStudents = selectedBranchId === 'all' 
@@ -109,6 +137,40 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGateReport, onNavigate }) 
         {/* Zone 2: Branch & User Selectors + Actions */}
         <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto text-xs">
           
+          {/* مؤشر حالة الشبكة */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] bg-[#FAF6F0] border border-[#E8DCCF]">
+            {isOnline ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-emerald-700 font-medium">متصل</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-amber-700 font-medium">أوفلاين</span>
+              </>
+            )}
+          </div>
+
+          {/* زر تحميل البيانات للعمل بدون إنترنت (أيقونة رمزية أنيقة) */}
+          <button
+            type="button"
+            onClick={handleOfflineSync}
+            disabled={!isOnline || isSyncing}
+            className={`p-2 rounded-xl transition flex items-center justify-center border cursor-pointer ${
+              syncStatus === 'success'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                : 'bg-[#FAF6F0] hover:bg-[#F6EEE4] border-[#E8DCCF] text-[#4A2F18]'
+            }`}
+            title="تحميل وتخزين بيانات الميدان محلياً للعمل بدون إنترنت"
+          >
+            {syncStatus === 'success' ? (
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+            ) : (
+              <CloudDownload className={`w-4 h-4 ${isSyncing ? 'animate-bounce text-amber-600' : ''}`} />
+            )}
+          </button>
+
           {/* Branch Switcher */}
           <div className="flex items-center gap-1.5 bg-[#F6EEE4] px-2.5 py-1.5 rounded-xl border border-[#E8DCCF]">
             <Building2 className="w-3.5 h-3.5 text-[#8C6D53] shrink-0" />
