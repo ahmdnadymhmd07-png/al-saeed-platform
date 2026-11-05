@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Navigation, NavTab } from './components/Navigation';
@@ -18,12 +18,29 @@ import { PrintModal } from './components/PrintModal';
 import { UserGuideModal } from './components/UserGuideModal';
 import { LoginScreen } from './components/LoginScreen';
 import { Student, Payment } from './types';
+import { WifiOff, Sparkles } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { isAuthenticated, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  
+  // مراقبة حالة الإنترنت لحل مشكلة الشاشة السوداء
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // إذا لم يكن المستخدم مسجلاً للدخول، يتم إظهار شاشة الدخول المخصصة
   if (!isAuthenticated || !currentUser) {
@@ -66,6 +83,15 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FBF8F5] flex flex-col text-[#2C1810]">
+      
+      {/* تنبيه ذكي في حال انقطاع الإنترنت بدلاً من شاشة المتصفح المزعجة */}
+      {!isOnline && (
+        <div className="bg-amber-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
+          <WifiOff className="w-4 h-4 animate-pulse" />
+          <span>أنت تعمل حالياً في وضع عدم الاتصال (Offline Mode) — سيتم حفظ التعديلات محلياً ومزامنتها فور عودة الإنترنت.</span>
+        </div>
+      )}
+
       {/* Header */}
       <Header 
         onOpenGateReport={handleOpenGateReport} 
