@@ -13,7 +13,6 @@ import {
   CheckCheck,
   MessageSquare,
   Sparkles,
-  Printer,
   BookOpen
 } from 'lucide-react';
 
@@ -31,12 +30,9 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
     saveStudentAttendanceBatch, 
     getStudentAbsenceCountThisMonth,
     checkStudentBan,
-    selectedBranchId,
-    branches,
-    settings
+    selectedBranchId
   } = useApp();
 
-  const [showRollPrintModal, setShowRollPrintModal] = useState(false);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('tahfeez');
   const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
     return groups.find(g => g.departmentId === 'tahfeez')?.id || groups[0]?.id || '';
@@ -175,70 +171,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
 
     saveStudentAttendanceBatch(records);
     setSaveSuccessNotice('تم حفظ تحضير الحلقة بنجاح! احتسبت النقاط وحُدث عداد الغياب.');
-  };
-
-  // 🖨️ دالة طباعة كشف الحلقة بشكل آمن ومنعزل تماماً لمنع أي قص أو ظهور للداشبورد
-  const handlePrintRollSheet = () => {
-    const printContent = document.getElementById('printable-roll-area');
-    if (!printContent) return;
-
-    const printWindow = window.open('', '_blank', 'width=950,height=750');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html lang="ar" dir="rtl">
-          <head>
-            <meta charset="UTF-8">
-            <title>طباعة كشف حضور الحلقة - مدرسة السعيد</title>
-            <style>
-              body {
-                font-family: 'Cairo', Tahoma, sans-serif;
-                direction: rtl;
-                background: #ffffff;
-                color: #000000;
-                margin: 0;
-                padding: 15px;
-                font-size: 11px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 10px;
-                margin-bottom: 10px;
-              }
-              th, td {
-                border: 1px solid #000000 !important;
-                padding: 6px 8px;
-                text-align: right;
-              }
-              th {
-                background-color: #f3f4f6 !important;
-                font-weight: bold;
-              }
-              .no-print, button, input, select {
-                display: none !important;
-              }
-              .border-b-2 { border-bottom: 2px solid #000; }
-              .border-t { border-top: 1px solid #000; }
-              .text-center { text-align: center; }
-              .font-bold { font-weight: bold; }
-              .font-black { font-weight: 900; }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-            <script>
-              window.onload = function() {
-                setTimeout(function() {
-                  window.print();
-                  window.close();
-                }, 300);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
   };
 
   return (
@@ -509,141 +441,6 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({ on
                 تأكيد العذر
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Official Printable Halaqah Paper Roll Sheet Modal */}
-      {showRollPrintModal && activeGroup && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-[#FFFFFF] w-full max-w-4xl rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden my-4">
-            
-            {/* Modal Controls (Hidden during print) */}
-            <div className="no-print bg-[#4A2F18] p-4 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-[#D8C3AE]" />
-                <h3 className="text-xs font-bold">معاينة كشف حضور الحلقة الورقي للطباعة ({activeGroup.name})</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrintRollSheet}
-                  className="px-4 py-1.5 bg-[#B9895B] hover:bg-[#A37549] text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>طباعة الكشف الآن (A4)</span>
-                </button>
-                <button 
-                  onClick={() => setShowRollPrintModal(false)} 
-                  className="text-white hover:text-red-200 text-lg font-bold px-2 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Sheet with ID for isolated printing */}
-            <div id="printable-roll-area" className="p-6 sm:p-8 text-black space-y-4">
-              
-              {/* Official Header */}
-              <div className="border-b-2 border-black pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-sm font-extrabold text-black">{settings.associationName}</h1>
-                    <h2 className="text-base font-black text-black mt-0.5">{settings.schoolName} — {branches.find(b => b.id === activeGroup.branchId)?.name || 'الفرع الرئيسي'}</h2>
-                    <h3 className="text-xs font-bold text-gray-700 mt-0.5">
-                      {departments.find(d => d.id === activeGroup.departmentId)?.name} • دفتر التحضير الورقي للحلقة
-                    </h3>
-                  </div>
-                  {settings.reportShowLogo !== false && (
-                    <img 
-                      src={settings.logoUrl || '/school_logo.jpg'} 
-                      alt="شعار" 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-black" 
-                      referrerPolicy="no-referrer"
-                      onError={(e) => { e.currentTarget.src = '/school_logo.jpg'; }}
-                    />
-                  )}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-gray-300 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-bold text-gray-800">
-                  <div><span>الحلقة: </span><strong className="text-black">{activeGroup.name}</strong></div>
-                  <div><span>المحفظ: </span><strong className="text-black">{activeTeacher?.fullName || 'الشيخ المحفظ'}</strong></div>
-                  <div><span>المواعيد: </span><strong className="text-black">{activeGroup.days?.join('، ')} ({activeGroup.startTime} - {activeGroup.endTime})</strong></div>
-                  <div><span>شهر/عام: </span><strong className="text-black">{new Date().toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}</strong></div>
-                </div>
-              </div>
-
-              {/* Student Roster Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-right border-collapse text-[10px] border border-black">
-                  <thead>
-                    <tr className="bg-gray-100 font-bold border-b border-black text-center">
-                      <th className="py-2 px-1 border-l border-black w-8">م</th>
-                      <th className="py-2 px-2 border-l border-black w-44 text-right">اسم الطالب رباعياً</th>
-                      <th className="py-2 px-1 border-l border-black w-16">الصف</th>
-                      <th className="py-2 px-1 border-l border-black w-14">كود الطالب</th>
-                      {Array.from({ length: 12 }).map((_, i) => (
-                        <th key={i} className="py-1 px-0.5 border-l border-black text-center w-6 tabular-nums">
-                          {i + 1}
-                        </th>
-                      ))}
-                      <th className="py-2 px-1 border-l border-black w-14">حضور</th>
-                      <th className="py-2 px-1 border-l border-black w-14">غياب</th>
-                      <th className="py-2 px-2 w-28">ملاحظات المحفظ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black">
-                    {groupStudents.length === 0 ? (
-                      <tr>
-                        <td colSpan={19} className="py-4 text-center text-gray-500 font-bold">
-                          لا يوجد طلاب مقيدون في هذه الحلقة حالياً
-                        </td>
-                      </tr>
-                    ) : (
-                      groupStudents.map((s, idx) => (
-                        <tr key={s.id} className="h-7.5">
-                          <td className="py-1 px-1 border-l border-black text-center font-bold tabular-nums">{idx + 1}</td>
-                          <td className="py-1 px-2 border-l border-black font-bold text-black text-xs">{s.fullName}</td>
-                          <td className="py-1 px-1 border-l border-black text-center">{s.grade}</td>
-                          <td className="py-1 px-1 border-l border-black text-center font-mono text-[9px]">{s.id.toUpperCase()}</td>
-                          {Array.from({ length: 12 }).map((_, i) => (
-                            <td key={i} className="py-1 px-0.5 border-l border-black text-center"></td>
-                          ))}
-                          <td className="py-1 px-1 border-l border-black text-center text-[9px]">.....</td>
-                          <td className="py-1 px-1 border-l border-black text-center text-[9px]">.....</td>
-                          <td className="py-1 px-2 text-[9px] text-gray-400">...................</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Footer and Signatures */}
-              <div className="pt-3 border-t border-black space-y-3">
-                <div className="flex items-center justify-between text-[10px] text-gray-700">
-                  <span>دليل الرموز المعتمدة: [ ✔ حاضر ] [ ✘ غائب ] [ ع غائب بعذر رسمي ]</span>
-                  <span>إجمالي طلاب الحلقة: <strong className="text-black">{groupStudents.length} طالب</strong></span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 pt-3 text-center text-xs font-bold text-black border-t border-dotted border-gray-400">
-                  <div>
-                    <span>توقيع الشيخ المحفظ</span>
-                    <div className="h-8 border-b border-dotted border-black w-36 mx-auto mt-2" />
-                  </div>
-                  <div>
-                    <span>اعتماد المشرف التربوي</span>
-                    <div className="h-8 border-b border-dotted border-black w-36 mx-auto mt-2" />
-                  </div>
-                  <div>
-                    <span>اعتماد مدير الفرع</span>
-                    <div className="h-8 border-b border-dotted border-black w-36 mx-auto mt-2" />
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
           </div>
         </div>
       )}
