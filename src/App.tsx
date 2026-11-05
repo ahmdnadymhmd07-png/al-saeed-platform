@@ -155,13 +155,6 @@ const MainAppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsGuideModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-[#F6EEE4] hover:bg-[#EADDCF] text-[#4A2F18] font-bold rounded-lg transition cursor-pointer text-[11px]"
-              title="عرض الدليل التفصيلي الشامل لمنصة السعيد"
-            >
-              <span>📖 الدليل التفصيلي للمنصة</span>
-            </button>
             <span className="tabular-nums font-bold bg-[#FAF6F0] px-3 py-1 rounded-full border border-[#E8DCCF] text-[#4A2F18]">
               الإصدار 1.0 • 1448 هـ / 2027 م
             </span>
