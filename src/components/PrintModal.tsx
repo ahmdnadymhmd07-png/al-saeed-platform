@@ -33,31 +33,41 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
   const isFemale = student?.gender === 'female';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto pt-4 sm:pt-8 print:p-0 print:bg-white print:static print:overflow-visible">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto pt-4 sm:pt-8">
       
-      {/* CSS مخصص للطباعة يضمن إلغاء أي قطع علوي نهائياً */}
+      {/* CSS مخصص للطباعة يضمن طباعة المستند فقط وإخفاء أي شيء سواه */}
       <style>{`
         @media print {
-          body, html {
-            height: auto !important;
-            overflow: visible !important;
-            background: #fff !important;
+          /* إخفاء الصفحة بالكامل وبدء صفحة بيضاء نظيفة */
+          body * {
+            visibility: hidden !important;
           }
-          .print-modal-container {
+          
+          /* إظهار صندوق المستند فقط ومحتواه الداخلي */
+          #printable-area, #printable-area * {
+            visibility: visible !important;
+          }
+
+          #printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
             box-shadow: none !important;
             border: none !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important;
+            background: white !important;
           }
+
+          /* إخفاء أزرار التحكم العلوية تماماً عند الطباعة */
           .no-print {
             display: none !important;
           }
         }
       `}</style>
 
-      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden my-auto print-modal-container">
+      <div className="bg-[#FFFFFF] w-full max-w-2xl rounded-2xl border border-[#E8DCCF] shadow-2xl overflow-hidden my-auto">
         
         {/* Modal Controls (hidden during print) */}
         <div className="no-print bg-[#4A2F18] p-4 text-white flex items-center justify-between sticky top-0 z-10 shadow-md">
@@ -82,8 +92,8 @@ export const PrintModal: React.FC<PrintModalProps> = ({ type, student, payment, 
           </div>
         </div>
 
-        {/* Printable Paper A4 Layout */}
-        <div className="p-6 sm:p-10 text-xs text-[#2C1810] space-y-6 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-4">
+        {/* Printable Paper A4 Layout - تمت إضافة الـ id هنا لتمييزه للطباعة */}
+        <div id="printable-area" className="p-6 sm:p-10 text-xs text-[#2C1810] space-y-6 max-h-[85vh] overflow-y-auto">
           
           {/* Header */}
           <div className="border-b-2 border-[#4A2F18] pb-4 flex items-center justify-between pt-1">
