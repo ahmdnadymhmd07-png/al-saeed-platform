@@ -75,6 +75,8 @@ export interface Student {
   id: string;
   branchId: string;
   fullName: string; // 4-part name
+  nationalId?: string; // الرقم القومي (14 رقماً)
+  birthDate?: string;  // تاريخ الميلاد المستخرج
   gender?: 'male' | 'female';
   grade: string;    // الصف الثالث الابتدائي، إلخ
   stage: EducationalStage;
