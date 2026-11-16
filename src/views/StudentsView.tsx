@@ -28,6 +28,47 @@ const checkIsFemale = (genderValue: string | undefined | null): boolean => {
   return normalized === 'female' || normalized === 'أنثى' || normalized === 'أنثي';
 };
 
+// دالة ذكية لتحليل الرقم القومي المصري واستخراج تاريخ الميلاد والحساب الدقيق للعمر
+const parseNationalId = (nationalId: string) => {
+  if (!nationalId || nationalId.length !== 14) return null;
+
+  const centuryCode = parseInt(nationalId.charAt(0));
+  let century = 1900;
+  if (centuryCode === 2) century = 1800;
+  else if (centuryCode === 3) century = 1900;
+  else if (centuryCode === 4) century = 2000;
+
+  const year = century + parseInt(nationalId.substr(1, 2));
+  const month = parseInt(nationalId.substr(3, 2));
+  const day = parseInt(nationalId.substr(5, 2));
+
+  const birthDateObj = new Date(year, month - 1, day);
+  if (isNaN(birthDateObj.getTime())) return null;
+
+  const birthDateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  const today = new Date();
+  let ageYears = today.getFullYear() - year;
+  let ageMonths = today.getMonth() - (month - 1);
+  let ageDays = today.getDate() - day;
+
+  if (ageDays < 0) {
+    ageMonths--;
+    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    ageDays += lastMonth.getDate();
+  }
+
+  if (ageMonths < 0) {
+    ageYears--;
+    ageMonths += 12;
+  }
+
+  return {
+    birthDate: birthDateString,
+    ageText: `${ageYears} سنة، و ${ageMonths} شهر، و ${ageDays} يوم`
+  };
+};
+
 export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onPrintAdmissionSlip }) => {
   const { 
     students, 
@@ -67,6 +108,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     selectedBranchId !== 'all' ? selectedBranchId : branches[0]?.id || 'b1'
   );
   const [fullName, setFullName] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [ageDetails, setAgeDetails] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [stage, setStage] = useState<EducationalStage>('primary');
   const [grade, setGrade] = useState('الصف الرابع الابتدائي');
@@ -82,6 +126,26 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const [notes, setNotes] = useState('');
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // دالة التعامل مع كتابة الرقم القومي
+  const handleNationalIdChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, '').slice(0, 14);
+    setNationalId(cleaned);
+
+    if (cleaned.length === 14) {
+      const parsed = parseNationalId(cleaned);
+      if (parsed) {
+        setBirthDate(parsed.birthDate);
+        setAgeDetails(parsed.ageText);
+      } else {
+        setBirthDate('');
+        setAgeDetails('الرقم القومي غير صحيح أو التاريخ غير صالح');
+      }
+    } else {
+      setBirthDate('');
+      setAgeDetails('');
+    }
+  };
 
   const detectedSiblings = useMemo(() => {
     const cleanPhone = guardianPhone.replace(/\D/g, '').slice(-9);
@@ -121,7 +185,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         const query = searchQuery.toLowerCase();
         const matchesName = s.fullName.toLowerCase().includes(query);
         const matchesPhone = s.guardianPhone.includes(query);
-        if (!matchesName && !matchesPhone) return false;
+        const matchesNatId = s.nationalId?.includes(query);
+        if (!matchesName && !matchesPhone && !matchesNatId) return false;
       }
       return true;
     });
@@ -147,6 +212,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   const resetFormFields = () => {
     setEditingStudentId(null);
     setFullName('');
+    setNationalId('');
+    setBirthDate('');
+    setAgeDetails('');
     setGender('male');
     setGuardianPhone('');
     setIsOrphan(false);
@@ -170,6 +238,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     setEditingStudentId(student.id);
     setStudentBranchId(student.branchId);
     setFullName(student.fullName);
+    setNationalId(student.nationalId || '');
+    if (student.nationalId && student.nationalId.length === 14) {
+      const parsed = parseNationalId(student.nationalId);
+      if (parsed) {
+        setBirthDate(parsed.birthDate);
+        setAgeDetails(parsed.ageText);
+      }
+    } else {
+      setBirthDate(student.birthDate || '');
+      setAgeDetails('');
+    }
     setGender(isFemale ? 'female' : 'male');
     setStage(student.stage);
     setGrade(student.grade);
@@ -188,7 +267,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     setIsFormOpen(true);
   };
 
-  // 🚀 الدالة أصبحت async مع استخدام await للحفظ المباشر والدائم في Supabase
   const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -196,6 +274,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
     if (nameParts.length < 4) {
       setFormError('الاسم رباعي إلزامي: يرجى كتابة الاسم الرباعي كاملاً (4 أجزاء على الأقل)');
+      return;
+    }
+
+    if (nationalId && nationalId.length !== 14) {
+      setFormError('الرقم القومي يجب أن يكون 14 رقماً بالضبط');
       return;
     }
 
@@ -222,6 +305,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
       const studentData = {
         branchId: studentBranchId,
         fullName: fullName.trim(),
+        nationalId: nationalId.trim() || undefined,
+        birthDate: birthDate || undefined,
         gender: gender,
         grade,
         stage,
@@ -247,7 +332,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         setIsFormOpen(false);
         resetFormFields();
       } else {
-        // ✨ الاستدعاء المعالج هنا مع await
         const newStudent = await addStudent(studentData);
         setIsFormOpen(false);
         resetFormFields();
@@ -263,12 +347,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
   };
 
   const handleExportCSV = () => {
-    const headers = ['المعرف', 'الاسم رباعي', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
+    const headers = ['المعرف', 'الاسم رباعي', 'الرقم القومي', 'تاريخ الميلاد', 'النوع', 'المرحلة', 'الصف', 'هاتف ولي الأمر', 'اليتيم', 'حالة الاشتراك', 'الحالة'];
     const rows = filteredStudents.map(s => {
       const isFemale = checkIsFemale(s.gender);
       return [
         s.id,
         `"${s.fullName}"`,
+        s.nationalId || '',
+        s.birthDate || '',
         isFemale ? 'أنثى' : 'ذكر',
         s.stage === 'primary' ? 'ابتدائي' : s.stage === 'prep' ? 'إعدادي' : 'ثانوي فما فوق',
         `"${s.grade}"`,
@@ -319,7 +405,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
         <div>
           <h2 className="text-base font-bold text-[#4A2F18]">شؤون الطلاب واستمارة القيد والتسجيل</h2>
           <p className="text-xs text-[#8C6D53]">
-            تسجيل الطلاب الجدد، تعديل البيانات، ربط الإخوة، ضبط إعفاءات الأيتام، ومتابعة حالات المنع من الدخول
+            تسجيل الطلاب الجدد، الرقم القومي والحساب التلقائي للعمر، تعديل البيانات، وربط الإخوة
           </p>
         </div>
 
@@ -331,7 +417,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
             <Download className="w-4 h-4 text-[#8C6D53]" />
             <span>تصدير CSV</span>
           </button>
-          
+           
           {(currentUser.role === 'admin' || currentUser.role === 'data_entry') && (
             <button
               onClick={handleOpenAddNew}
@@ -350,7 +436,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
           <Search className="w-4 h-4 absolute right-3 top-2.5 text-[#8C6D53]" />
           <input
             type="text"
-            placeholder="بحث بالاسم أو الهاتف..."
+            placeholder="بحث بالاسم، الهاتف، أو الرقم القومي..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-3 pr-9 py-1.5 text-xs rounded-lg border border-[#E8DCCF] focus:outline-hidden focus:border-[#4A2F18] bg-[#FBF8F5]"
@@ -484,6 +570,44 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] focus:border-[#4A2F18] focus:outline-hidden bg-[#FBF8F5]"
                 />
+              </div>
+
+              {/* حقل الرقم القومي وتاريخ الميلاد والعمر المحسوب أوتوماتيكياً */}
+              <div className="p-3.5 bg-[#F6EEE4] rounded-xl border border-[#E8DCCF] space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+                      الرقم القومي (14 رقماً)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={14}
+                      placeholder="أدخل 14 رقماً من شهادة الميلاد"
+                      value={nationalId}
+                      onChange={(e) => handleNationalIdChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-white text-left tabular-nums font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#4A2F18] mb-1">
+                      تاريخ الميلاد (المستخرج أوتوماتيكياً)
+                    </label>
+                    <input
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E8DCCF] bg-white tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                {ageDetails && (
+                  <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                    <span>العمر الحالي:</span>
+                    <span className="tabular-nums">{ageDetails}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -804,7 +928,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                           )}
                         </div>
                         <span className="text-[11px] text-[#8C6D53] tabular-nums dir-ltr block text-right mt-0.5">
-                          {student.guardianPhone}
+                          {student.guardianPhone} {student.nationalId ? `• قومي: ${student.nationalId}` : ''}
                         </span>
                         {student.status === 'dropped' && (
                           <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
