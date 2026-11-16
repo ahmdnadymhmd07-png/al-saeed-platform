@@ -32,18 +32,25 @@ const checkIsFemale = (genderValue: string | undefined | null): boolean => {
 const parseNationalId = (nationalId: string) => {
   if (!nationalId || nationalId.length !== 14) return null;
 
-  const centuryCode = parseInt(nationalId.charAt(0));
-  let century = 1900;
-  if (centuryCode === 2) century = 1800;
-  else if (centuryCode === 3) century = 1900;
-  else if (centuryCode === 4) century = 2000;
+  const centuryCode = parseInt(nationalId.charAt(0), 10);
+  let century = 0;
+  if (centuryCode === 2) century = 1900;
+  else if (centuryCode === 3) century = 2000;
+  else return null;
 
-  const year = century + parseInt(nationalId.substr(1, 2));
-  const month = parseInt(nationalId.substr(3, 2));
-  const day = parseInt(nationalId.substr(5, 2));
+  const year = century + parseInt(nationalId.substring(1, 3), 10);
+  const month = parseInt(nationalId.substring(3, 5), 10);
+  const day = parseInt(nationalId.substring(5, 7), 10);
 
   const birthDateObj = new Date(year, month - 1, day);
-  if (isNaN(birthDateObj.getTime())) return null;
+  if (
+    isNaN(birthDateObj.getTime()) ||
+    birthDateObj.getFullYear() !== year ||
+    birthDateObj.getMonth() !== month - 1 ||
+    birthDateObj.getDate() !== day
+  ) {
+    return null;
+  }
 
   const birthDateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -78,7 +85,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
     families, 
     selectedBranchId, 
     addStudent, 
-    updateStudent,
+    updateStudent, 
     deleteStudent, 
     setStudentDropped,
     reactivateStudent,
