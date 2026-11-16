@@ -848,7 +848,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent, onP
                   className="w-4 h-4 text-[#4A2F18] rounded cursor-pointer shrink-0"
                 />
                 <label htmlFor="agreementCheckbox" className="text-xs font-bold text-[#4A2F18] cursor-pointer">
-                  اطّلع ولي الأمر على شروط الالتحاق الثمانية بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
+                  اطّلع ولي الأمر على شروط الالتحاق بمدرسة السعيد ووافق عليها وتعهد بالالتزام بها.
                 </label>
               </div>
 
