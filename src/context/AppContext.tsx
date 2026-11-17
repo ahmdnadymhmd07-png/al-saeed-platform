@@ -50,14 +50,15 @@ import {
   initialAuditLogs,
   OFFICIAL_SCHOOL_LOGO
 } from '../data/initialData';
-import { testSupabaseConnection, supabase } from '../lib/supabase';
+import { testSupabaseConnection } from '../lib/supabase';
 import {
   mappers,
   fetchTable,
   upsertRecord,
   insertBatch,
   deleteRecord,
-  processOfflineQueue
+  processOfflineQueue,
+  getPendingSyncCount
 } from '../lib/supabaseSync';
 
 const normalizeStudent = (s: any): Student => {
@@ -234,7 +235,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const savedUserId = localStorage.getItem(AUTH_KEY);
       if (savedUserId) {
-        const found = initialUsers.find(u => u.id === savedUserId);
+        const storedUsers = loadFromStorage<User[]>('users', initialUsers);
+        const found = storedUsers.find(u => u.id === savedUserId) || initialUsers.find(u => u.id === savedUserId);
         if (found) return found;
       }
     } catch {
@@ -387,11 +389,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [syncStatusMessage, setSyncStatusMessage] = useState<string>('جارٍ الاتصال بقاعدة بيانات Supabase...');
 
   const fetchFromSupabase = async (): Promise<{ success: boolean; message: string }> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const pending = getPendingSyncCount();
+      setIsSupabaseConnected(false);
+      setSyncStatusMessage(
+        pending > 0
+          ? `وضع العمل بدون إنترنت — لديك (${pending}) عملية محفوظة محلياً بانتظار الشبكة.`
+          : 'وضع العمل بدون إنترنت — يتم العرض والحفظ محلياً على الجهاز.'
+      );
+      return { success: false, message: 'لا يوجد اتصال بالإنترنت حالياً' };
+    }
+
     setIsSyncing(true);
-    setSyncStatusMessage('جارٍ فحص وتحميل البيانات من Supabase...');
+    setSyncStatusMessage('جارٍ فحص ومزامنة البيانات مع Supabase...');
     try {
-      // 🔄 محاولة تفريغ أي عمليات معلقة محلياً أولاً فور الفحص
-      await processOfflineQueue();
+      // 🔄 1. تفريغ أي عمليات معلقة محلياً أولاً قبل سحب البيانات من السيرفر
+      const syncResult = await processOfflineQueue();
+      if (syncResult.processed > 0) {
+        console.log(`[Offline Sync] تم رفع ${syncResult.processed} عملية معلقة بنجاح!`);
+      }
+
+      // حماية التعديلات المحلية: لو لسه فيه عناصر ما اترفعتش، ما نمسحهاش بالبيانات القديمة من السيرفر
+      if (getPendingSyncCount() > 0) {
+        setIsSyncing(false);
+        setSyncStatusMessage(`توجد (${getPendingSyncCount()}) عمليات محفوظة محلياً بانتظار إتمام الرفع...`);
+        return { success: false, message: 'بانتظار إتمام رفع التعديلات المحلية' };
+      }
 
       const conn = await testSupabaseConnection();
       setIsSupabaseConnected(conn.success);
@@ -473,11 +496,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (dbSettings.length > 0 && dbSettings[0]) setSettings(dbSettings[0]);
 
       setIsSyncing(false);
-      setSyncStatusMessage('قاعدة بيانات Supabase متصلة ومحدثة بنجاح.');
+      setSyncStatusMessage(
+        syncResult.processed > 0
+          ? `تم رفع (${syncResult.processed}) عملية محلية ومزامنة قاعدة البيانات بنجاح.`
+          : 'قاعدة بيانات Supabase متصلة ومحدثة بنجاح.'
+      );
       return { success: true, message: 'تم تحميل وتحديث البيانات من Supabase بنجاح.' };
     } catch (err: any) {
       setIsSyncing(false);
-      setSyncStatusMessage('حدث خطأ أثناء تحميل البيانات من Supabase.');
+      setSyncStatusMessage('تعذر الاتصال بالسيرفر — يتم العمل على البيانات المحفوظة محلياً.');
       return { success: false, message: err?.message || 'خطأ في الاتصال' };
     }
   };
@@ -523,6 +550,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     fetchFromSupabase();
+  }, []);
+
+  // 📡 مراقبة انقطاع وعودة الإنترنت لحظياً للمزامنة الفورية
+  useEffect(() => {
+    const handleOnline = async () => {
+      setSyncStatusMessage('عادت الشبكة! جارٍ رفع البيانات المحفوظة محلياً...');
+      await fetchFromSupabase();
+    };
+
+    const handleOffline = () => {
+      setIsSupabaseConnected(false);
+      setSyncStatusMessage('انقطع الاتصال بالإنترنت — المنصة تعمل الآن في الوضع المحلي (Offline).');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => { saveToStorage('branches', branches); }, [branches]);
@@ -576,7 +623,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const activeCase = disciplineCases.find(c => 
       c.studentId === studentId && 
-      c.status === 'open' &&
+      c.status === 'open' && 
       (c.level === 1 || c.level === 2)
     );
 
@@ -619,7 +666,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  // 🚀 دالة إضافة الطالب المتزامنة والمثالية لرفع وتأكيد ربط العائلات في Supabase
+  // 🚀 دالة إضافة الطالب المتزامنة (تعمل أونلاين وأوفلاين بسلاسة)
   const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>): Promise<Student> => {
     let finalFamilyId: string | undefined = undefined;
 
@@ -635,11 +682,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           finalFamilyId = existingFamily.id;
           await upsertRecord('families', mappers.family.toDb(existingFamily));
         } else if (siblingStudent) {
-          // إذا كان الشقيق مرتبطاً بعائلة من قبل، نأخذ معرف عائلته
           if (siblingStudent.familyId && siblingStudent.familyId.startsWith('fam_')) {
             finalFamilyId = siblingStudent.familyId;
           } else {
-            // إنشاء سجل عائلة جديد يجمع الشقيقين
             finalFamilyId = 'fam_' + Date.now();
             const nameParts = siblingStudent.fullName.trim().split(/\s+/);
             const fatherName = nameParts.length >= 2 ? nameParts.slice(1).join(' ') : siblingStudent.fullName;
@@ -651,25 +696,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               note: 'ربط إخوة تلقائي'
             };
 
-            // ⚠️ 1. حفظ العائلة الجديدة في Supabase أولاً بشكل متزامن
-            const famSaved = await upsertRecord('families', mappers.family.toDb(newFamilyObj));
+            await upsertRecord('families', mappers.family.toDb(newFamilyObj));
+            setFamilies(prev => [...prev, newFamilyObj]);
 
-            if (famSaved) {
-              setFamilies(prev => [...prev, newFamilyObj]);
+            const updatedSiblingObj: Student = {
+              ...siblingStudent,
+              familyId: finalFamilyId,
+              updatedAt: new Date().toISOString()
+            };
 
-              // ⚠️ 2. إنشاء كائن الشقيق المحدث بصريح العبارة ورفعه فوراً بدون الاعتماد على تأخير الـ State
-              const updatedSiblingObj: Student = {
-                ...siblingStudent,
-                familyId: finalFamilyId,
-                updatedAt: new Date().toISOString()
-              };
-
-              // تحديث الـ State المحلي للشقيق
-              setStudents(prev => prev.map(s => s.id === siblingStudent.id ? updatedSiblingObj : s));
-
-              // رفع الشقيق بالقيم الجديدة مباشرة إلى Supabase
-              await upsertRecord('students', mappers.student.toDb(updatedSiblingObj));
-            }
+            setStudents(prev => prev.map(s => s.id === siblingStudent.id ? updatedSiblingObj : s));
+            await upsertRecord('students', mappers.student.toDb(updatedSiblingObj));
           }
         } else if (selectedId.startsWith('fam_')) {
           finalFamilyId = selectedId;
@@ -686,13 +723,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatedAt: new Date().toISOString()
       });
 
-      // 3️⃣ حفظ الطالب الجديد في Supabase
-      const studentSaved = await upsertRecord('students', mappers.student.toDb(newStudent));
-
-      if (studentSaved) {
-        setStudents(prev => [newStudent, ...prev]);
-        addAuditLog('إضافة طالب', `تسجيل الطالب ${studentData.fullName} وربطه بالعائلة بنجاح`);
-      }
+      // 3️⃣ حفظ الطالب محلياً وفي Supabase (أو طابور الأوفلاين)
+      setStudents(prev => [newStudent, ...prev]);
+      await upsertRecord('students', mappers.student.toDb(newStudent));
+      addAuditLog('إضافة طالب', `تسجيل الطالب ${studentData.fullName} وربطه بالعائلة بنجاح`);
 
       return newStudent;
     } catch (err: any) {
@@ -1062,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         orphanDiscount,
         siblingDiscount,
         amount: netAmount,
-        paidAmount: netAmount === 0 ? 0 : 0,
+        paidAmount: 0,
         status: netAmount === 0 ? 'paid' : 'unpaid',
         dueDate: `${month}-${String(settings.dueDay).padStart(2, '0')}`,
         createdAt: now
