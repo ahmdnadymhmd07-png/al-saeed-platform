@@ -40,17 +40,18 @@ export default defineConfig(() => {
           clientsClaim: true,
           skipWaiting: true,
           cleanupOutdatedCaches: true,
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/\.well-known/, /^\/assetlinks\.json/],
           runtimeCaching: [
             {
-           urlPattern: ({ request }) => request.mode === 'navigate',
-           handler: 'StaleWhileRevalidate',
-           options: {
-             cacheName: 'pages-cache'
-           }
-         },
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'pages-cache'
+              }
+            },
             {
               urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
               handler: 'NetworkFirst',
