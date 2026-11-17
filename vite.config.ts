@@ -45,13 +45,12 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/\.well-known/, /^\/assetlinks\.json/],
           runtimeCaching: [
             {
-              urlPattern: ({ request }) => request.mode === 'navigate',
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'pages-cache',
-                networkTimeoutSeconds: 3
-              }
-            },
+           urlPattern: ({ request }) => request.mode === 'navigate',
+           handler: 'StaleWhileRevalidate',
+           options: {
+             cacheName: 'pages-cache'
+           }
+         },
             {
               urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
               handler: 'NetworkFirst',
