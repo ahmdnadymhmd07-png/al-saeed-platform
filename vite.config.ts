@@ -37,8 +37,12 @@ export default defineConfig(() => {
           orientation: 'portrait'
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg}'],
+          clientsClaim: true,
+          skipWaiting: true,
+          cleanupOutdatedCaches: true,
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
           navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/\.well-known/, /^\/assetlinks\.json/],
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.mode === 'navigate',
@@ -49,13 +53,28 @@ export default defineConfig(() => {
               }
             },
             {
-              urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+              urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'supabase-data-cache',
+                networkTimeoutSeconds: 4,
                 expiration: {
-                  maxEntries: 200,
-                  maxAgeSeconds: 60 * 60 * 24 * 7 // حفظ البيانات لمدة أسبوع
+                  maxEntries: 300,
+                  maxAgeSeconds: 60 * 60 * 24 * 7
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 365
                 },
                 cacheableResponse: {
                   statuses: [0, 200]
