@@ -856,3 +856,13 @@ export async function deleteRecord(tableName: string, id: string): Promise<boole
     return true;
   }
 }
+
+// معرفة عدد العمليات المعلقة في طابور الأوفلاين
+export function getPendingSyncCount(): number {
+  return getOfflineQueue().length;
+}
+
+// التحقق هل الجدول لديه تعديلات معلقة لم تُرفع بعد
+export function hasPendingChangesForTable(tableName: string): boolean {
+  return getOfflineQueue().some(item => item.tableName === tableName);
+}
