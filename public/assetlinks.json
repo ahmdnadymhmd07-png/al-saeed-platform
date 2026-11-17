@@ -1,1 +1,14 @@
-
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.al_saeed_platform.twa",
+      "sha256_cert_fingerprints": [
+        "4F:8D:A5:39:4F:FE:23:41:2E:37:78:E1:99:51:E8:5B:C2:CC:63:46:04:5B:D7:2C:CD:8B:AC:70:87:36:C4:92"
+      ]
+    }
+  }
+]
